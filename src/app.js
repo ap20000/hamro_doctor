@@ -30,6 +30,11 @@ const swaggerOptions = {
     servers: [
       {
         url: 'http://localhost:5000',
+        description: 'Development server',
+      },
+      {
+        url: 'https://hamro-doctor.onrender.com',
+        description: 'Production server',
       },
     ],
     components: {
