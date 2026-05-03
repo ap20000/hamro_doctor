@@ -3,6 +3,8 @@ import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import dotenv from 'dotenv';
+import passport from 'passport';
+import './config/passport.js';
 import swaggerUi from 'swagger-ui-express';
 import swaggerJsdoc from 'swagger-jsdoc';
 
@@ -13,6 +15,10 @@ import recordRoutes from './routes/recordRoutes.js';
 import consultationRoutes from './routes/consultationRoutes.js';
 import prescriptionRoutes from './routes/prescriptionRoutes.js';
 import storyRoutes from './routes/storyRoutes.js';
+import doctorRoutes from './routes/doctorRoutes.js';
+import articleRoutes from './routes/articleRoutes.js';
+import forumRoutes from './routes/forumRoutes.js';
+import hospitalRoutes from './routes/hospitalRoutes.js';
 
 dotenv.config();
 
@@ -60,6 +66,9 @@ app.use(morgan('dev'));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+// Passport Middleware
+app.use(passport.initialize());
+
 // Health Check
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', message: 'Hamro Doctor API is running' });
@@ -72,6 +81,10 @@ app.use('/api/v1/records', recordRoutes);
 app.use('/api/v1/consultations', consultationRoutes);
 app.use('/api/v1/prescriptions', prescriptionRoutes);
 app.use('/api/v1/stories', storyRoutes);
+app.use('/api/v1/doctor', doctorRoutes);
+app.use('/api/v1/articles', articleRoutes);
+app.use('/api/v1/forum', forumRoutes);
+app.use('/api/v1/hospital', hospitalRoutes);
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {

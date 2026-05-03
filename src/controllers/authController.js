@@ -7,13 +7,13 @@ import { sendSMS } from '../utils/smsService.js';
 // @access  Public
 export const register = async (req, res, next) => {
   try {
-    const { name, email, phone, password, role } = req.body;
+    const { name, username, email, phone, password, role, doctorDetails } = req.body;
 
     // Check if user exists
-    const userExists = await User.findOne({ $or: [{ email }, { phone }] });
+    const userExists = await User.findOne({ $or: [{ email }, { phone }, { username }] });
     if (userExists) {
       res.status(400);
-      throw new Error('User already exists');
+      throw new Error('User with this email, phone or username already exists');
     }
 
     // Generate OTP
@@ -22,10 +22,12 @@ export const register = async (req, res, next) => {
 
     const user = await User.create({
       name,
+      username,
       email,
       phone,
       password,
       role: role || 'patient',
+      doctorDetails: role === 'doctor' ? doctorDetails : undefined,
       otp: {
         code: otpCode,
         expireAt: otpExpireAt,
@@ -90,10 +92,10 @@ export const verifyOtp = async (req, res, next) => {
 // @access  Public
 export const login = async (req, res, next) => {
   try {
-    const { loginId, password } = req.body; // loginId can be email or phone
+    const { loginId, password } = req.body; // loginId can be email, phone or username
 
     const user = await User.findOne({ 
-      $or: [{ email: loginId }, { phone: loginId }] 
+      $or: [{ email: loginId }, { phone: loginId }, { username: loginId }] 
     }).select('+password');
 
     if (user && (await user.matchPassword(password))) {
@@ -140,3 +142,74 @@ export const getMe = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Forgot Password (Send OTP to Phone)
+// @route   POST /api/v1/auth/forgot-password
+// @access  Public
+export const forgotPassword = async (req, res, next) => {
+  try {
+    const { phone } = req.body;
+
+    const user = await User.findOne({ phone });
+    if (!user) {
+      res.status(404);
+      throw new Error('No user found with this phone number');
+    }
+
+    // Generate OTP
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpireAt = new Date(Date.now() + process.env.OTP_EXPIRE * 60000);
+
+    user.otp = {
+      code: otpCode,
+      expireAt: otpExpireAt,
+    };
+    await user.save();
+
+    // Send SMS
+    const message = `Your Hamro Doctor password reset OTP is ${otpCode}. It expires in ${process.env.OTP_EXPIRE} minutes.`;
+    await sendSMS(phone, message);
+
+    res.json({
+      success: true,
+      message: 'Password reset OTP sent to your phone',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Reset Password
+// @route   POST /api/v1/auth/reset-password
+// @access  Public
+export const resetPassword = async (req, res, next) => {
+  try {
+    const { phone, code, newPassword } = req.body;
+
+    const user = await User.findOne({ phone });
+
+    if (!user) {
+      res.status(404);
+      throw new Error('User not found');
+    }
+
+    if (user.otp.code !== code || user.otp.expireAt < Date.now()) {
+      res.status(400);
+      throw new Error('Invalid or expired OTP');
+    }
+
+    // Update password
+    user.password = newPassword;
+    user.otp.code = undefined;
+    user.otp.expireAt = undefined;
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Password reset successful. You can now login with your new password.',
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

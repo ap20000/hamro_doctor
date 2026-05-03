@@ -1,6 +1,9 @@
 import express from 'express';
-import { register, login, verifyOtp, getMe } from '../controllers/authController.js';
+import passport from 'passport';
+import { register, login, verifyOtp, getMe, forgotPassword, resetPassword } from '../controllers/authController.js';
 import { protect } from '../middleware/authMiddleware.js';
+import { generateToken } from '../utils/generateToken.js';
+import upload from '../middleware/uploadMiddleware.js';
 
 const router = express.Router();
 
@@ -50,6 +53,8 @@ router.post('/register', register);
  *         description: OTP verified, returns token
  */
 router.post('/verify-otp', verifyOtp);
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password', resetPassword);
 
 /**
  * @swagger
@@ -86,5 +91,97 @@ router.post('/login', login);
  *         description: Returns user data
  */
 router.get('/me', protect, getMe);
+
+// --- Social Login Routes ---
+
+/**
+ * @swagger
+ * /api/v1/auth/google:
+ *   get:
+ *     summary: Google Login
+ *     tags: [Auth]
+ */
+router.get('/google', passport.authenticate('google', { scope: ['profile', 'email'] }));
+
+/**
+ * @swagger
+ * /api/v1/auth/google/callback:
+ *   get:
+ *     summary: Google Auth Callback
+ *     tags: [Auth]
+ */
+router.get(
+  '/google/callback',
+  passport.authenticate('google', { session: false, failureRedirect: '/login' }),
+  (req, res) => {
+    const token = generateToken(req.user._id);
+    // In production, redirect to frontend with token
+    res.json({
+      success: true,
+      token,
+      user: {
+        _id: req.user._id,
+        name: req.user.name,
+        email: req.user.email,
+        role: req.user.role,
+      },
+    });
+  }
+);
+
+/**
+ * @swagger
+ * /api/v1/auth/facebook:
+ *   get:
+ *     summary: Facebook Login
+ *     tags: [Auth]
+ */
+router.get('/facebook', passport.authenticate('facebook', { scope: ['email'] }));
+
+/**
+ * @swagger
+ * /api/v1/auth/facebook/callback:
+ *   get:
+ *     summary: Facebook Auth Callback
+ *     tags: [Auth]
+ */
+router.get(
+  '/facebook/callback',
+  passport.authenticate('facebook', { session: false, failureRedirect: '/login' }),
+  (req, res) => {
+    const token = generateToken(req.user._id);
+    res.json({
+      success: true,
+      token,
+      user: {
+        _id: req.user._id,
+        name: req.user.name,
+        email: req.user.email,
+        role: req.user.role,
+      },
+    });
+  }
+);
+
+/**
+ * @swagger
+ * /api/v1/auth/upload-docs:
+ *   post:
+ *     summary: Upload doctor documents (Avatar/Council Doc)
+ *     tags: [Auth]
+ */
+router.post('/upload-docs', upload.fields([
+  { name: 'avatar', maxCount: 1 },
+  { name: 'councilDocument', maxCount: 1 }
+]), (req, res) => {
+  const files = {};
+  if (req.files.avatar) files.avatar = req.files.avatar[0].path;
+  if (req.files.councilDocument) files.councilDocument = req.files.councilDocument[0].path;
+
+  res.json({
+    success: true,
+    files
+  });
+});
 
 export default router;

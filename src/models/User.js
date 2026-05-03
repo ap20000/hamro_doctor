@@ -7,6 +7,11 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: [true, 'Please add a name'],
     },
+    username: {
+      type: String,
+      unique: true,
+      required: [true, 'Please add a username'],
+    },
     email: {
       type: String,
       unique: true,
@@ -25,7 +30,7 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['patient', 'doctor', 'admin'],
+      enum: ['patient', 'doctor', 'hospital', 'admin'],
       default: 'patient',
     },
     isVerified: {
@@ -53,16 +58,79 @@ const userSchema = new mongoose.Schema(
     },
     // Doctor specific fields
     doctorDetails: {
-      specialization: String,
+      specialization: [String],
       qualification: String,
       nmcNumber: String,
       experience: Number,
       bio: String,
       signature: String, // Path to signature image
+      councilDocument: String, // URL to uploaded council doc
       isApproved: {
         type: Boolean,
         default: false,
       },
+      isOnline: {
+        type: Boolean,
+        default: false,
+      },
+      publicProfile: {
+        education: [{
+          degree: String,
+          institute: String,
+          year: Number
+        }],
+        awards: [String],
+        research: [String],
+        memberships: [String],
+        activities: [String],
+      },
+      hospitals: [{
+        name: String,
+        address: String,
+        opdTime: [{
+          day: {
+            type: String,
+            enum: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+          },
+          startTime: String,
+          endTime: String
+        }]
+      }],
+      stats: {
+        totalPageViews: { type: Number, default: 0 },
+        articleViews: { type: Number, default: 0 },
+        recommendations: { type: Number, default: 0 },
+      }
+    },
+    // Hospital specific fields
+    hospitalDetails: {
+      description: String,
+      listingRequestStatus: {
+        type: String,
+        enum: ['pending', 'approved', 'rejected'],
+        default: 'pending'
+      },
+      doctors: [{
+        doctor: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: 'User'
+        },
+        opdRate: Number,
+        availability: [{
+          day: String,
+          slots: [String]
+        }]
+      }],
+      healthPackages: [{
+        name: String,
+        description: String,
+        price: Number,
+        features: [String]
+      }],
+      stats: {
+        totalViews: { type: Number, default: 0 },
+        recommendations: { type: Number, default: 0 },
+      }
     },
     googleId: String,
     facebookId: String,
