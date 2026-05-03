@@ -52,3 +52,33 @@ export const getBMI = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Get all doctors
+// @route   GET /api/v1/users/doctors
+// @access  Public
+export const getDoctors = async (req, res, next) => {
+  try {
+    const { speciality, isOnline } = req.query;
+    const filter = { role: 'doctor' };
+
+    if (speciality) {
+      filter['doctorDetails.speciality'] = speciality;
+    }
+
+    if (isOnline) {
+      filter['doctorDetails.isOnline'] = isOnline === 'true';
+    }
+
+    const doctors = await User.find(filter)
+      .select('name username profile.avatar doctorDetails.speciality doctorDetails.nmcNumber doctorDetails.isOnline doctorDetails.experience');
+
+    res.json({
+      success: true,
+      count: doctors.length,
+      doctors
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+

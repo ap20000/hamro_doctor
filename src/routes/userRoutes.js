@@ -1,8 +1,29 @@
 import express from 'express';
-import { updateProfile, getBMI } from '../controllers/userController.js';
+import { updateProfile, getBMI, getDoctors } from '../controllers/userController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
+
+/**
+ * @swagger
+ * /api/v1/users/doctors:
+ *   get:
+ *     summary: Get all available doctors with filters
+ *     tags: [Users]
+ *     parameters:
+ *       - in: query
+ *         name: speciality
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: isOnline
+ *         schema:
+ *           type: boolean
+ *     responses:
+ *       200:
+ *         description: List of doctors
+ */
+router.get('/doctors', getDoctors);
 
 /**
  * @swagger
