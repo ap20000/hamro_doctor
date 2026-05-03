@@ -74,6 +74,13 @@ app.use(express.urlencoded({ extended: true }));
 // Passport Middleware
 app.use(passport.initialize());
 
+// Static files (for prescription PDFs)
+import { fileURLToPath } from 'url';
+import path from 'path';
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+app.use('/src/uploads', express.static(path.join(__dirname, 'uploads')));
+
 // Health Check
 app.get('/health', (req, res) => {
   res.status(200).json({ status: 'OK', message: 'Hamro Doctor API is running' });

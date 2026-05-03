@@ -47,8 +47,18 @@ io.on('connection', (socket) => {
 
   // Signaling for WebRTC (Audio/Video Calls)
   socket.on('call_signal', (data) => {
-    const { consultationId, signal, from } = data;
-    socket.to(consultationId).emit('call_signal', { signal, from });
+    console.log(`Broadcasting call_signal (${data.type}) in room ${data.consultationId}`);
+    socket.to(data.consultationId).emit('call_signal', data);
+  });
+
+  socket.on('reject_call', (data) => {
+    console.log(`Call rejected in room ${data.consultationId}`);
+    socket.to(data.consultationId).emit('reject_call');
+  });
+
+  socket.on('end_call', (data) => {
+    console.log(`Ending call in room ${data.consultationId}`);
+    socket.to(data.consultationId).emit('end_call');
   });
 
   socket.on('disconnect', () => {
@@ -58,8 +68,8 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 5000;
 
-server.listen(PORT, () => {
-  console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT} (Exposed to network)`);
 });
 
 export { io };

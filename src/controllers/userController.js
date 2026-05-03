@@ -69,8 +69,11 @@ export const getDoctors = async (req, res, next) => {
       filter['doctorDetails.isOnline'] = isOnline === 'true';
     }
 
+    console.log('Fetching doctors with filter:', filter);
     const doctors = await User.find(filter)
       .select('name username profile.avatar doctorDetails.speciality doctorDetails.nmcNumber doctorDetails.isOnline doctorDetails.experience');
+
+    console.log('Doctors found in DB:', doctors.length);
 
     res.json({
       success: true,

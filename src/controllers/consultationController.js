@@ -1,5 +1,39 @@
 import Consultation from '../models/Consultation.js';
 
+// @desc    Request consultation
+// @route   POST /api/v1/consultations/request
+// @access  Private (Patient)
+export const requestConsultation = async (req, res, next) => {
+  try {
+    const { doctorId } = req.body;
+
+    // Check if there's already a pending or active consultation with this doctor
+    const existing = await Consultation.findOne({
+      patient: req.user._id,
+      doctor: doctorId,
+      status: { $in: ['pending', 'active'] }
+    });
+
+    if (existing) {
+      res.status(400);
+      throw new Error('You already have an ongoing or pending consultation request with this doctor');
+    }
+
+    const consultation = await Consultation.create({
+      patient: req.user._id,
+      doctor: doctorId,
+      status: 'pending',
+    });
+
+    res.status(201).json({
+      success: true,
+      consultation,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // @desc    Start consultation (after payment)
 // @route   POST /api/v1/consultations/start
 // @access  Private (Patient)
@@ -79,17 +113,105 @@ export const startCallSession = async (req, res, next) => {
 // @access  Private
 export const getMyConsultations = async (req, res, next) => {
   try {
+    const { status } = req.query;
     const query = req.user.role === 'patient' 
       ? { patient: req.user._id } 
       : { doctor: req.user._id };
 
+    if (status) {
+      query.status = status;
+    }
+
     const consultations = await Consultation.find(query)
       .populate('patient', 'name profile')
-      .populate('doctor', 'name doctorDetails');
+      .populate('doctor', 'name doctorDetails')
+      .sort({ createdAt: -1 });
 
     res.json({
       success: true,
       consultations,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get single consultation by ID
+// @route   GET /api/v1/consultations/:id
+// @access  Private
+export const getConsultationById = async (req, res, next) => {
+  try {
+    const consultation = await Consultation.findById(req.params.id)
+      .populate('patient', 'name profile')
+      .populate('doctor', 'name doctorDetails');
+
+    if (!consultation) {
+      res.status(404);
+      throw new Error('Consultation not found');
+    }
+
+    // Check authorization
+    if (
+      consultation.patient._id.toString() !== req.user._id.toString() &&
+      consultation.doctor._id.toString() !== req.user._id.toString()
+    ) {
+      res.status(403);
+      throw new Error('Not authorized to access this consultation');
+    }
+
+    res.json({
+      success: true,
+      consultation,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Respond to consultation request (Accept/Reject)
+// @route   PATCH /api/v1/consultations/:id/respond
+// @access  Private (Doctor)
+export const respondToConsultation = async (req, res, next) => {
+  try {
+    const { status } = req.body; // active or cancelled
+    if (!['active', 'cancelled'].includes(status)) {
+      res.status(400);
+      throw new Error('Invalid status. Use active to accept or cancelled to reject.');
+    }
+
+    const consultation = await Consultation.findById(req.params.id);
+
+    if (!consultation) {
+      res.status(404);
+      throw new Error('Consultation not found');
+    }
+
+    if (consultation.doctor.toString() !== req.user._id.toString()) {
+      res.status(403);
+      throw new Error('Not authorized to respond to this request');
+    }
+
+    if (consultation.status !== 'pending') {
+      res.status(400);
+      throw new Error('Consultation is not in pending state');
+    }
+
+    consultation.status = status;
+    
+    if (status === 'active') {
+      const start = new Date();
+      const end = new Date();
+      end.setDate(start.getDate() + 7); // 7 days access
+      consultation.consultationStart = start;
+      consultation.consultationEnd = end;
+    }
+
+    await consultation.save();
+
+    res.json({
+      success: true,
+      message: `Consultation ${status === 'active' ? 'accepted' : 'rejected'}`,
+      consultation,
     });
   } catch (error) {
     next(error);

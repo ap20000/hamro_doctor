@@ -1,10 +1,40 @@
 import express from 'express';
-import { startConsultation, startCallSession, getMyConsultations } from '../controllers/consultationController.js';
+import { 
+  startConsultation, 
+  startCallSession, 
+  getMyConsultations, 
+  requestConsultation, 
+  respondToConsultation,
+  getConsultationById
+} from '../controllers/consultationController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
 router.use(protect);
+
+/**
+ * @swagger
+ * /api/v1/consultations/request:
+ *   post:
+ *     summary: Request a consultation (Patient)
+ *     tags: [Consultations]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [doctorId]
+ *             properties:
+ *               doctorId: {type: string}
+ *     responses:
+ *       201:
+ *         description: Request sent
+ */
+router.post('/request', requestConsultation);
 
 /**
  * @swagger
@@ -72,5 +102,36 @@ router.post('/:id/session', startCallSession);
  *         description: Returns list of consultations
  */
 router.get('/', getMyConsultations);
+
+/**
+ * @swagger
+ * /api/v1/consultations/{id}/respond:
+ *   patch:
+ *     summary: Respond to consultation request (Doctor)
+ *     tags: [Consultations]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [status]
+ *             properties:
+ *               status: {type: string, enum: [active, cancelled]}
+ *     responses:
+ *       200:
+ *         description: Responded successfully
+ */
+router.patch('/:id/respond', respondToConsultation);
+
+router.get('/:id', getConsultationById);
 
 export default router;
