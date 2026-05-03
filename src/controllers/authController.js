@@ -41,6 +41,7 @@ export const register = async (req, res, next) => {
 
     // Send real SMS
     const message = `Your Hamro Doctor OTP is ${otpCode}. It expires in ${process.env.OTP_EXPIRE} minutes.`;
+    console.log(`[DEBUG] Registration OTP for ${phone}: ${otpCode}`);
     await sendSMS(phone, message);
 
     res.status(201).json({
@@ -173,6 +174,7 @@ export const forgotPassword = async (req, res, next) => {
 
     // Send SMS
     const message = `Your Hamro Doctor password reset OTP is ${otpCode}. It expires in ${process.env.OTP_EXPIRE} minutes.`;
+    console.log(`[DEBUG] Password Reset OTP for ${phone}: ${otpCode}`);
     await sendSMS(phone, message);
 
     res.json({
