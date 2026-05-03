@@ -58,10 +58,18 @@ const userSchema = new mongoose.Schema(
     },
     // Doctor specific fields
     doctorDetails: {
-      specialization: [String],
+      salutation: {
+        type: String,
+        enum: ['Dr.', 'Prof. Dr.', 'Assoc. Prof. Dr.', 'Asst. Prof. Dr.']
+      },
+      firstName: String,
+      lastName: String,
+      speciality: String,
+      specialization: [String], // Array for multiple
       qualification: String,
-      nmcNumber: String,
-      experience: Number,
+      nmcNumber: String, // NMC / NAMC / NHPC
+      experience: Number, // Years Practiced
+      website: String,
       bio: String,
       signature: String, // Path to signature image
       councilDocument: String, // URL to uploaded council doc

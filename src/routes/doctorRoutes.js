@@ -1,5 +1,5 @@
 import express from 'express';
-import { getDashboardStats, updateStatus, manageHospitals, getEarningsReport } from '../controllers/doctorController.js';
+import { getDashboardStats, updateStatus, manageHospitals, getEarningsReport, updateProfile } from '../controllers/doctorController.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -58,5 +58,16 @@ router.post('/hospitals', manageHospitals);
  *       - bearerAuth: []
  */
 router.get('/earnings', getEarningsReport);
+
+/**
+ * @swagger
+ * /api/v1/doctor/profile:
+ *   put:
+ *     summary: Update doctor profile details
+ *     tags: [Doctor]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.put('/profile', updateProfile);
 
 export default router;

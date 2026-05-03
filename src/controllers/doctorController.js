@@ -101,3 +101,33 @@ export const getEarningsReport = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Update doctor profile
+// @route   PUT /api/v1/doctor/profile
+// @access  Private (Doctor)
+export const updateProfile = async (req, res, next) => {
+  try {
+    const { doctorDetails, profile, name } = req.body;
+    
+    const user = await User.findById(req.user._id);
+
+    if (name) user.name = name;
+    if (profile) {
+      user.profile = { ...user.profile.toObject(), ...profile };
+    }
+    if (doctorDetails) {
+      user.doctorDetails = { ...user.doctorDetails.toObject(), ...doctorDetails };
+    }
+
+    await user.save();
+
+    res.json({
+      success: true,
+      message: 'Profile updated successfully',
+      user
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
