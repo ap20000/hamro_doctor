@@ -30,8 +30,8 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['patient', 'doctor', 'hospital', 'admin'],
-      default: 'patient',
+      enum: ['patient', 'doctor', 'hospital', 'pharmaceutical', 'surgical', 'admin'],
+      required: true,
     },
     isVerified: {
       type: Boolean,
@@ -130,6 +130,30 @@ const userSchema = new mongoose.Schema(
       stats: {
         totalViews: { type: Number, default: 0 },
         recommendations: { type: Number, default: 0 },
+      }
+    },
+    // Pharmaceutical specific fields
+    pharmaceuticalDetails: {
+      description: String,
+      isSubscribed: { type: Boolean, default: false },
+      subscriptionExpiry: Date,
+      isBoosted: { type: Boolean, default: false },
+      boostExpiry: Date,
+      stats: {
+        totalViews: { type: Number, default: 0 },
+        medicineViews: { type: Number, default: 0 },
+      }
+    },
+    // Surgical specific fields
+    surgicalDetails: {
+      description: String,
+      isSubscribed: { type: Boolean, default: false },
+      subscriptionExpiry: Date,
+      isBoosted: { type: Boolean, default: false },
+      boostExpiry: Date,
+      stats: {
+        totalViews: { type: Number, default: 0 },
+        productViews: { type: Number, default: 0 },
       }
     },
     googleId: String,

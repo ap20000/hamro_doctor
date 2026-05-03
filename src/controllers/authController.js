@@ -16,6 +16,11 @@ export const register = async (req, res, next) => {
       throw new Error('User with this email, phone or username already exists');
     }
 
+    if (!role || !['doctor', 'patient'].includes(role)) {
+      res.status(400);
+      throw new Error('Please specify a valid role (doctor or patient)');
+    }
+
     // Generate OTP
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
     const otpExpireAt = new Date(Date.now() + process.env.OTP_EXPIRE * 60000);
@@ -26,7 +31,7 @@ export const register = async (req, res, next) => {
       email,
       phone,
       password,
-      role: role || 'patient',
+      role,
       doctorDetails: role === 'doctor' ? doctorDetails : undefined,
       otp: {
         code: otpCode,

@@ -19,6 +19,11 @@ import doctorRoutes from './routes/doctorRoutes.js';
 import articleRoutes from './routes/articleRoutes.js';
 import forumRoutes from './routes/forumRoutes.js';
 import hospitalRoutes from './routes/hospitalRoutes.js';
+import pharmaceuticalRoutes from './routes/pharmaceuticalRoutes.js';
+import surgicalRoutes from './routes/surgicalRoutes.js';
+import adminRoutes from './routes/adminRoutes.js';
+import marketingRoutes from './routes/marketingRoutes.js';
+import newsRoutes from './routes/newsRoutes.js';
 
 dotenv.config();
 
@@ -85,6 +90,11 @@ app.use('/api/v1/doctor', doctorRoutes);
 app.use('/api/v1/articles', articleRoutes);
 app.use('/api/v1/forum', forumRoutes);
 app.use('/api/v1/hospital', hospitalRoutes);
+app.use('/api/v1/pharmaceutical', pharmaceuticalRoutes);
+app.use('/api/v1/surgical', surgicalRoutes);
+app.use('/api/v1/admin', adminRoutes);
+app.use('/api/v1/marketing', marketingRoutes);
+app.use('/api/v1/news', newsRoutes);
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {
