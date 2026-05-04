@@ -170,7 +170,7 @@ export const getMyConsultations = async (req, res, next) => {
 
     const consultations = await Consultation.find(query)
       .populate('patient', 'name profile')
-      .populate('doctor', 'name doctorDetails')
+      .populate('doctor', 'name doctorDetails profile')
       .sort({ createdAt: -1 });
 
     res.json({
@@ -219,7 +219,7 @@ export const getConsultationById = async (req, res, next) => {
   try {
     const consultation = await Consultation.findById(req.params.id)
       .populate('patient', 'name profile')
-      .populate('doctor', 'name doctorDetails');
+      .populate('doctor', 'name doctorDetails profile');
 
     if (!consultation) {
       res.status(404);

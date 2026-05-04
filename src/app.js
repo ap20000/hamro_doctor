@@ -68,8 +68,8 @@ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 app.use(helmet());
 app.use(cors());
 app.use(morgan('dev'));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Passport Middleware
 app.use(passport.initialize());
@@ -105,9 +105,32 @@ app.use('/api/v1/news', newsRoutes);
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {
-  const statusCode = res.statusCode === 200 ? 500 : res.statusCode;
+  let statusCode = res.statusCode === 200 ? 500 : res.statusCode;
+  let message = err.message;
+
+  // Handle Mongoose Validation Errors
+  if (err.name === 'ValidationError') {
+    statusCode = 400;
+    const messages = Object.values(err.errors).map(val => {
+      // Clean up enum errors
+      if (val.kind === 'enum') {
+        return `Please select a valid ${val.path.split('.').pop()}`;
+      }
+      return val.message;
+    });
+    message = messages[0]; // Return the first clean error
+  }
+
+  // Handle Mongoose Duplicate Key Errors
+  if (err.code === 11000) {
+    statusCode = 400;
+    const field = Object.keys(err.keyValue)[0];
+    message = `${field.charAt(0).toUpperCase() + field.slice(1)} already exists`;
+  }
+
   res.status(statusCode).json({
-    message: err.message,
+    success: false,
+    message: message,
     stack: process.env.NODE_ENV === 'production' ? null : err.stack,
   });
 });

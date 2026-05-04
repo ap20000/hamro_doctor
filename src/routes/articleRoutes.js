@@ -1,36 +1,28 @@
 import express from 'express';
 import { createArticle, getArticles, getArticle } from '../controllers/articleController.js';
+import { 
+  addComment, 
+  getComments, 
+  toggleLikeArticle, 
+  toggleDislikeArticle, 
+  toggleLikeComment 
+} from '../controllers/interactionController.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-/**
- * @swagger
- * /api/v1/articles:
- *   post:
- *     summary: Write a new article (Doctor only)
- *     tags: [Articles]
- *     security:
- *       - bearerAuth: []
- */
+// Basic CRUD
 router.post('/', protect, authorize('doctor'), createArticle);
-
-/**
- * @swagger
- * /api/v1/articles:
- *   get:
- *     summary: Get all published articles
- *     tags: [Articles]
- */
 router.get('/', getArticles);
-
-/**
- * @swagger
- * /api/v1/articles/{id}:
- *   get:
- *     summary: Get single article details
- *     tags: [Articles]
- */
 router.get('/:id', getArticle);
+
+// Interactions
+router.patch('/:id/like', protect, toggleLikeArticle);
+router.patch('/:id/dislike', protect, toggleDislikeArticle);
+
+// Comments
+router.post('/:id/comments', protect, addComment);
+router.get('/:id/comments', getComments);
+router.patch('/comments/:id/like', protect, toggleLikeComment);
 
 export default router;

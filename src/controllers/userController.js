@@ -1,4 +1,5 @@
 import User from '../models/User.js';
+import sharp from 'sharp';
 
 // @desc    Update user profile
 // @route   PUT /api/v1/users/profile
@@ -23,7 +24,22 @@ export const updateProfile = async (req, res, next) => {
         }
       }
 
-      const updatedUser = await user.save();
+      if (user.role === 'doctor' && req.body.doctorDetails) {
+        user.doctorDetails = { ...user.doctorDetails, ...req.body.doctorDetails };
+      }
+
+      // Use findByIdAndUpdate to bypass validation of unrelated fields (like username) 
+      // which might be missing in legacy user records
+      const updatedUser = await User.findByIdAndUpdate(
+        req.user._id,
+        { 
+          name: user.name,
+          email: user.email,
+          profile: user.profile,
+          doctorDetails: user.doctorDetails
+        },
+        { new: true, runValidators: true }
+      );
 
       res.json({
         success: true,
@@ -85,3 +101,44 @@ export const getDoctors = async (req, res, next) => {
   }
 };
 
+// @desc    Update avatar with compression
+// @route   POST /api/v1/users/avatar
+// @access  Private
+export const updateAvatar = async (req, res, next) => {
+  try {
+    const { image } = req.body; // Expecting Base64 string
+    if (!image) {
+      res.status(400);
+      throw new Error('No image provided');
+    }
+
+    // Extract the Base64 data (remove the prefix like "data:image/jpeg;base64,")
+    const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
+    const buffer = Buffer.from(base64Data, 'base64');
+
+    // Compress and resize using sharp
+    const compressedBuffer = await sharp(buffer)
+      .resize(200, 200, { fit: 'cover' }) // Square avatar
+      .jpeg({ quality: 80 }) // Compress to 80% quality JPEG
+      .toBuffer();
+
+    const compressedBase64 = `data:image/jpeg;base64,${compressedBuffer.toString('base64')}`;
+
+    // Use findByIdAndUpdate instead of save() to avoid triggering validation 
+    // on required fields that aren't being modified (like username)
+    const updatedUser = await User.findByIdAndUpdate(
+      req.user._id,
+      { 'profile.avatar': compressedBase64 },
+      { new: true }
+    );
+
+    res.json({
+      success: true,
+      avatar: compressedBase64,
+      user: updatedUser
+    });
+  } catch (error) {
+    console.error('Avatar update error:', error);
+    next(error);
+  }
+};

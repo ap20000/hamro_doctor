@@ -1,5 +1,5 @@
 import express from 'express';
-import { updateProfile, getBMI, getDoctors } from '../controllers/userController.js';
+import { updateProfile, getBMI, getDoctors, updateAvatar } from '../controllers/userController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -70,5 +70,6 @@ router.put('/profile', protect, updateProfile);
  *         description: Returns BMI data
  */
 router.get('/bmi', protect, getBMI);
+router.post('/avatar', protect, updateAvatar);
 
 export default router;

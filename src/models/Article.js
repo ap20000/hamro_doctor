@@ -22,6 +22,18 @@ const articleSchema = new mongoose.Schema(
       type: Number,
       default: 0,
     },
+    likes: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
+    dislikes: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
     status: {
       type: String,
       enum: ['pending', 'published', 'rejected'],

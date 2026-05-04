@@ -5,10 +5,35 @@ import Article from '../models/Article.js';
 // @access  Private (Doctor)
 export const createArticle = async (req, res, next) => {
   try {
+    const { title, content, category, tags, featureImage } = req.body;
+    let processedImage = featureImage;
+
+    // Compress image if provided
+    if (featureImage && featureImage.startsWith('data:image')) {
+      try {
+        const base64Data = featureImage.replace(/^data:image\/\w+;base64,/, '');
+        const buffer = Buffer.from(base64Data, 'base64');
+        
+        const compressedBuffer = await sharp(buffer)
+          .resize(1200, 675, { fit: 'cover' }) // 16:9 aspect ratio for articles
+          .jpeg({ quality: 80 })
+          .toBuffer();
+        
+        processedImage = `data:image/jpeg;base64,${compressedBuffer.toString('base64')}`;
+      } catch (sharpError) {
+        console.error('Sharp processing error:', sharpError);
+        // Fallback to original image if compression fails
+      }
+    }
+
     const article = await Article.create({
-      ...req.body,
+      title,
+      content,
+      category,
+      tags,
+      featureImage: processedImage,
       author: req.user._id,
-      status: 'pending' // Always pending until admin approves
+      status: 'published' // Direct publishing enabled for now
     });
 
     res.status(201).json({

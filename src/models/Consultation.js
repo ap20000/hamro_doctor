@@ -34,6 +34,7 @@ const consultationSchema = new mongoose.Schema(
           enum: ['audio', 'video', 'chat'],
         },
         durationInMinutes: Number,
+        durationInSeconds: Number,
       }
     ],
     messages: [
