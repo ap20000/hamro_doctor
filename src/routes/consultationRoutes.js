@@ -1,11 +1,13 @@
 import express from 'express';
 import { 
   startConsultation, 
-  startCallSession, 
+  startCallSession,
+  finishCallSession,
   getMyConsultations, 
   requestConsultation, 
   respondToConsultation,
-  getConsultationById
+  getConsultationById,
+  completeConsultation
 } from '../controllers/consultationController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
@@ -88,6 +90,7 @@ router.post('/start', startConsultation);
  *         description: Session started
  */
 router.post('/:id/session', startCallSession);
+router.patch('/:id/session/:sessionId/finish', finishCallSession);
 
 /**
  * @swagger
@@ -131,6 +134,7 @@ router.get('/', getMyConsultations);
  *         description: Responded successfully
  */
 router.patch('/:id/respond', respondToConsultation);
+router.patch('/:id/complete', completeConsultation);
 
 router.get('/:id', getConsultationById);
 

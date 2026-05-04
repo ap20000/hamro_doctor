@@ -38,6 +38,7 @@ io.on('connection', (socket) => {
     });
 
     io.to(consultationId).emit('receive_message', {
+      consultationId,
       sender: senderId,
       text,
       attachments,

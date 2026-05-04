@@ -84,7 +84,8 @@ export const startCallSession = async (req, res, next) => {
     }
 
     const startTime = new Date();
-    const endTime = new Date(startTime.getTime() + 15 * 60000); // 15 mins
+    // Initially set endTime to 15 mins later as a fallback
+    const endTime = new Date(startTime.getTime() + 15 * 60000); 
 
     consultation.sessions.push({
       startTime,
@@ -94,14 +95,48 @@ export const startCallSession = async (req, res, next) => {
     });
 
     await consultation.save();
+    
+    // Return the session ID so frontend can update it later
+    const session = consultation.sessions[consultation.sessions.length - 1];
 
     res.json({
       success: true,
-      session: {
-        startTime,
-        endTime,
-        type,
-      },
+      session,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Finish call session (Update actual end time)
+// @route   PATCH /api/v1/consultations/:id/session/:sessionId/finish
+// @access  Private
+export const finishCallSession = async (req, res, next) => {
+  try {
+    const { id, sessionId } = req.params;
+    const consultation = await Consultation.findById(id);
+
+    if (!consultation) {
+      res.status(404);
+      throw new Error('Consultation not found');
+    }
+
+    const session = consultation.sessions.id(sessionId);
+    if (!session) {
+      res.status(404);
+      throw new Error('Session not found');
+    }
+
+    session.endTime = new Date();
+    const diffMs = session.endTime - session.startTime;
+    session.durationInSeconds = Math.floor(diffMs / 1000);
+    session.durationInMinutes = Math.ceil(diffMs / 60000);
+
+    await consultation.save();
+
+    res.json({
+      success: true,
+      session,
     });
   } catch (error) {
     next(error);
@@ -122,6 +157,17 @@ export const getMyConsultations = async (req, res, next) => {
       query.status = status;
     }
 
+    // Auto-complete expired consultations
+    const now = new Date();
+    await Consultation.updateMany(
+      { 
+        ...query, 
+        status: 'active', 
+        consultationEnd: { $lt: now } 
+      },
+      { $set: { status: 'completed' } }
+    );
+
     const consultations = await Consultation.find(query)
       .populate('patient', 'name profile')
       .populate('doctor', 'name doctorDetails')
@@ -130,6 +176,36 @@ export const getMyConsultations = async (req, res, next) => {
     res.json({
       success: true,
       consultations,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Complete consultation manually
+// @route   PATCH /api/v1/consultations/:id/complete
+// @access  Private (Doctor)
+export const completeConsultation = async (req, res, next) => {
+  try {
+    const consultation = await Consultation.findById(req.params.id);
+
+    if (!consultation) {
+      res.status(404);
+      throw new Error('Consultation not found');
+    }
+
+    if (consultation.doctor.toString() !== req.user._id.toString()) {
+      res.status(403);
+      throw new Error('Not authorized to complete this consultation');
+    }
+
+    consultation.status = 'completed';
+    await consultation.save();
+
+    res.json({
+      success: true,
+      message: 'Consultation marked as completed',
+      consultation,
     });
   } catch (error) {
     next(error);
@@ -152,8 +228,8 @@ export const getConsultationById = async (req, res, next) => {
 
     // Check authorization
     if (
-      consultation.patient._id.toString() !== req.user._id.toString() &&
-      consultation.doctor._id.toString() !== req.user._id.toString()
+      consultation.patient?._id.toString() !== req.user._id.toString() &&
+      consultation.doctor?._id.toString() !== req.user._id.toString()
     ) {
       res.status(403);
       throw new Error('Not authorized to access this consultation');
