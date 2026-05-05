@@ -1,4 +1,8 @@
 import http from 'http';
+import https from 'https';
+import fs from 'fs';
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { Server } from 'socket.io';
 import app from './app.js';
 import connectDB from './config/db.js';
@@ -6,10 +10,27 @@ import dotenv from 'dotenv';
 
 dotenv.config();
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 // Connect to Database
 connectDB();
 
-const server = http.createServer(app);
+let server;
+const certPath = path.join(__dirname, '../../certs/cert.pem');
+const keyPath = path.join(__dirname, '../../certs/key.pem');
+
+if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
+  const options = {
+    key: fs.readFileSync(keyPath),
+    cert: fs.readFileSync(certPath),
+  };
+  server = https.createServer(options, app);
+  console.log('HTTPS Server initialized');
+} else {
+  server = http.createServer(app);
+  console.log('HTTP Server initialized (SSL certs not found)');
+}
 
 // Socket.io Setup
 const io = new Server(server, {
@@ -69,8 +90,11 @@ io.on('connection', (socket) => {
 
 const PORT = process.env.PORT || 5000;
 
-server.listen(PORT, () => {
-  console.log(`Server running in ${process.env.NODE_ENV} mode on http://localhost:${PORT}`);
+server.listen(PORT, '0.0.0.0', () => {
+  const protocol = server instanceof https.Server ? 'https' : 'http';
+  console.log(`Server running in ${process.env.NODE_ENV} mode`);
+  console.log(`- Local:   ${protocol}://localhost:${PORT}`);
+  console.log(`- Network: ${protocol}://192.168.110.29:${PORT}`);
 });
 
 export { io };
