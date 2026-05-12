@@ -133,3 +133,142 @@ export const updateHospitalProfile = async (req, res, next) => {
     next(error);
   }
 };
+
+// @desc    Get all users linked to this hospital
+// @route   GET /api/v1/hospital/users
+// @access  Private/Hospital
+export const getHospitalUsers = async (req, res, next) => {
+  try {
+    const { role } = req.query;
+    const query = { associatedHospital: req.user._id };
+    if (role) query.role = role;
+
+    const users = await User.find(query).sort('-createdAt');
+    res.json({
+      success: true,
+      count: users.length,
+      users,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Create user by Hospital
+// @route   POST /api/v1/hospital/onboard
+// @access  Private/Hospital
+export const onboardHospitalUser = async (req, res, next) => {
+  try {
+    const { name, username, email, phone, password, role } = req.body;
+
+    if (!['doctor', 'patient', 'nurse'].includes(role)) {
+      res.status(400);
+      throw new Error('Hospital can only onboard doctors, nurses, and patients');
+    }
+
+    const userExists = await User.findOne({ $or: [{ email }, { phone }, { username }] });
+    if (userExists) {
+      res.status(400);
+      throw new Error('User already exists');
+    }
+
+    const userPayload = {
+      name,
+      username,
+      email,
+      phone,
+      password,
+      role,
+      isVerified: true,
+      associatedHospital: req.user._id
+    };
+
+    if (role === 'doctor') {
+      userPayload.doctorDetails = { isApproved: true };
+    }
+
+    const user = await User.create(userPayload);
+
+    res.status(201).json({
+      success: true,
+      user,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Approve or reject doctor link request
+// @route   PATCH /api/v1/hospital/link-requests/:doctorId
+// @access  Private/Hospital
+export const approveHospitalLink = async (req, res, next) => {
+  try {
+    const { status } = req.body; // 'approved' or 'rejected'
+    
+    if (!['approved', 'rejected'].includes(status)) {
+      res.status(400);
+      throw new Error('Status must be approved or rejected');
+    }
+
+    const hospital = await User.findById(req.user._id);
+    if (!hospital) {
+      res.status(404);
+      throw new Error('Hospital not found');
+    }
+
+    const doctorsList = hospital.hospitalDetails?.doctors || [];
+    const doctorIndex = doctorsList.findIndex(
+      d => d.doctor?.toString() === req.params.doctorId
+    );
+
+    if (doctorIndex === -1) {
+      res.status(404);
+      throw new Error('Link request not found for this doctor');
+    }
+
+    // Use updateOne to avoid full document validation
+    await User.updateOne(
+      { _id: req.user._id, 'hospitalDetails.doctors.doctor': req.params.doctorId },
+      { $set: { 'hospitalDetails.doctors.$.status': status } }
+    );
+
+    // Fetch the updated hospital to return the correct doctors list
+    const updatedHospital = await User.findById(req.user._id);
+
+    res.json({
+      success: true,
+      message: `Doctor link request ${status} successfully`,
+      doctors: updatedHospital.hospitalDetails.doctors
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get hospital link requests
+// @route   GET /api/v1/hospital/link-requests
+// @access  Private/Hospital
+export const getHospitalLinkRequests = async (req, res, next) => {
+  try {
+    const hospital = await User.findById(req.user._id).populate({
+      path: 'hospitalDetails.doctors.doctor',
+      select: 'name email phone doctorDetails'
+    });
+
+    const requests = hospital.hospitalDetails.doctors.map(d => ({
+      _id: d.doctor?._id,
+      name: d.doctor?.name,
+      email: d.doctor?.email,
+      phone: d.doctor?.phone,
+      speciality: d.doctor?.doctorDetails?.speciality,
+      status: d.status
+    })).filter(r => r._id); // ensure doctor exists
+
+    res.json({
+      success: true,
+      requests
+    });
+  } catch (error) {
+    next(error);
+  }
+};

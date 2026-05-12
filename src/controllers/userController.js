@@ -28,6 +28,10 @@ export const updateProfile = async (req, res, next) => {
         user.doctorDetails = { ...user.doctorDetails, ...req.body.doctorDetails };
       }
 
+      if (user.role === 'hospital' && req.body.hospitalDetails) {
+        user.hospitalDetails = { ...user.hospitalDetails, ...req.body.hospitalDetails };
+      }
+
       // Use findByIdAndUpdate to bypass validation of unrelated fields (like username) 
       // which might be missing in legacy user records
       const updatedUser = await User.findByIdAndUpdate(
@@ -36,7 +40,8 @@ export const updateProfile = async (req, res, next) => {
           name: user.name,
           email: user.email,
           profile: user.profile,
-          doctorDetails: user.doctorDetails
+          doctorDetails: user.doctorDetails,
+          hospitalDetails: user.hospitalDetails
         },
         { new: true, runValidators: true }
       );
@@ -139,6 +144,117 @@ export const updateAvatar = async (req, res, next) => {
     });
   } catch (error) {
     console.error('Avatar update error:', error);
+    next(error);
+  }
+};
+
+// @desc    Get all approved hospitals
+// @route   GET /api/v1/users/hospitals
+// @access  Public
+export const getHospitals = async (req, res, next) => {
+  try {
+    const hospitals = await User.find({ 
+      role: 'hospital', 
+      'hospitalDetails.listingRequestStatus': 'approved' 
+    }).select('name _id hospitalDetails.description profile.address');
+    
+    res.json({
+      success: true,
+      count: hospitals.length,
+      hospitals
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Doctor requests to link with a hospital
+// @route   POST /api/v1/users/link-hospital
+// @access  Private (Doctor)
+export const requestHospitalLink = async (req, res, next) => {
+  try {
+    const { hospitalId } = req.body;
+    
+    if (req.user.role !== 'doctor') {
+      res.status(403);
+      throw new Error('Only doctors can request hospital links');
+    }
+
+    const hospital = await User.findOne({ _id: hospitalId, role: 'hospital' });
+    if (!hospital) {
+      res.status(404);
+      throw new Error('Hospital not found');
+    }
+
+    // Ensure hospitalDetails exists
+    if (!hospital.hospitalDetails) {
+      hospital.hospitalDetails = {};
+    }
+    const doctorsList = hospital.hospitalDetails.doctors || [];
+
+    // Check if already linked or requested
+    const existingLink = doctorsList.find(d => d.doctor?.toString() === req.user._id.toString());
+    
+    if (existingLink) {
+      res.status(400);
+      throw new Error(`You have already sent a request or are already linked to this hospital (Status: ${existingLink.status})`);
+    }
+
+    // Add to hospital's doctor list with pending status using updateOne to avoid full document validation
+    await User.updateOne(
+      { _id: hospitalId },
+      { 
+        $push: { 
+          'hospitalDetails.doctors': {
+            doctor: req.user._id,
+            status: 'pending'
+          }
+        } 
+      }
+    );
+
+    res.json({
+      success: true,
+      message: 'Link request sent to hospital successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get hospitals the doctor is linked to or requested
+// @route   GET /api/v1/users/my-hospitals
+// @access  Private (Doctor)
+export const getMyHospitals = async (req, res, next) => {
+  try {
+    if (req.user.role !== 'doctor') {
+      res.status(403);
+      throw new Error('Only doctors can fetch their linked hospitals');
+    }
+
+    // Find all hospitals that have this doctor in their doctors array
+    const hospitals = await User.find({
+      role: 'hospital',
+      'hospitalDetails.doctors.doctor': req.user._id
+    }).select('name _id hospitalDetails.description profile.address hospitalDetails.doctors');
+
+    // Format the response
+    const myHospitals = hospitals.map(h => {
+      const doctorLink = h.hospitalDetails.doctors.find(d => d.doctor.toString() === req.user._id.toString());
+      return {
+        _id: h._id,
+        name: h.name,
+        address: h.profile?.address,
+        description: h.hospitalDetails?.description,
+        status: doctorLink?.status || 'unknown'
+      };
+    });
+
+    res.json({
+      success: true,
+      hospitals: myHospitals
+    });
+  } catch (error) {
     next(error);
   }
 };

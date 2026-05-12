@@ -4,8 +4,13 @@ import {
   manageHospitalDoctors, 
   getAppointments, 
   updateAppointmentStatus,
-  updateHospitalProfile 
+  updateHospitalProfile,
+  getHospitalUsers,
+  onboardHospitalUser,
+  approveHospitalLink,
+  getHospitalLinkRequests
 } from '../controllers/hospitalController.js';
+
 import { protect, authorize } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -67,5 +72,10 @@ router.patch('/appointments/:id', updateAppointmentStatus);
  *       - bearerAuth: []
  */
 router.put('/profile', updateHospitalProfile);
+
+router.get('/users', getHospitalUsers);
+router.post('/onboard', onboardHospitalUser);
+router.get('/link-requests', getHospitalLinkRequests);
+router.patch('/link-requests/:doctorId', approveHospitalLink);
 
 export default router;

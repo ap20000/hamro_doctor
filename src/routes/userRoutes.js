@@ -1,5 +1,5 @@
 import express from 'express';
-import { updateProfile, getBMI, getDoctors, updateAvatar } from '../controllers/userController.js';
+import { updateProfile, getBMI, getDoctors, updateAvatar, getHospitals, requestHospitalLink, getMyHospitals } from '../controllers/userController.js';
 import { protect } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -24,6 +24,7 @@ const router = express.Router();
  *         description: List of doctors
  */
 router.get('/doctors', getDoctors);
+router.get('/hospitals', getHospitals); // Get all approved hospitals
 
 /**
  * @swagger
@@ -71,5 +72,9 @@ router.put('/profile', protect, updateProfile);
  */
 router.get('/bmi', protect, getBMI);
 router.post('/avatar', protect, updateAvatar);
+
+// Doctor specific route to request linking
+router.get('/my-hospitals', protect, getMyHospitals);
+router.post('/link-hospital', protect, requestHospitalLink);
 
 export default router;

@@ -7,7 +7,7 @@ import { sendSMS } from '../utils/smsService.js';
 // @access  Public
 export const register = async (req, res, next) => {
   try {
-    const { name, username, email, phone, password, role, doctorDetails } = req.body;
+    const { name, username, email, phone, password, role, address, doctorDetails, hospitalDetails } = req.body;
 
     // Check if user exists
     const userExists = await User.findOne({ $or: [{ email }, { phone }, { username }] });
@@ -16,28 +16,45 @@ export const register = async (req, res, next) => {
       throw new Error('User with this email, phone or username already exists');
     }
 
-    if (!role || !['doctor', 'patient'].includes(role)) {
+    if (!role || !['doctor', 'patient', 'hospital', 'nurse'].includes(role)) {
       res.status(400);
-      throw new Error('Please specify a valid role (doctor or patient)');
+      throw new Error('Please specify a valid role (doctor, patient, hospital, or nurse)');
     }
 
-    // Generate OTP
-    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpireAt = new Date(Date.now() + process.env.OTP_EXPIRE * 60000);
-
-    const user = await User.create({
+    let userPayload = {
       name,
       username,
       email,
       phone,
       password,
       role,
+      profile: { address: address || '' },
       doctorDetails: role === 'doctor' ? doctorDetails : undefined,
-      otp: {
-        code: otpCode,
-        expireAt: otpExpireAt,
-      },
-    });
+    };
+
+    if (role === 'hospital') {
+      userPayload.hospitalDetails = hospitalDetails || { listingRequestStatus: 'pending' };
+      userPayload.isVerified = true; // Hospitals skip OTP, wait for admin approval
+      
+      const user = await User.create(userPayload);
+      
+      return res.status(201).json({
+        success: true,
+        message: 'Registration request sent successfully, Contact administration for approval',
+        userId: user._id,
+      });
+    }
+
+    // Generate OTP for other roles
+    const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const otpExpireAt = new Date(Date.now() + process.env.OTP_EXPIRE * 60000);
+    
+    userPayload.otp = {
+      code: otpCode,
+      expireAt: otpExpireAt,
+    };
+
+    const user = await User.create(userPayload);
 
     // Send real SMS
     const message = `Your Hamro Doctor OTP is ${otpCode}. It expires in ${process.env.OTP_EXPIRE} minutes.`;
@@ -110,6 +127,13 @@ export const login = async (req, res, next) => {
       if (!user.isVerified) {
         res.status(401);
         throw new Error('Please verify your account first');
+      }
+
+      if (user.role === 'hospital') {
+        if (!user.hospitalDetails || user.hospitalDetails.listingRequestStatus !== 'approved') {
+          res.status(401);
+          throw new Error('Your registration request is pending admin approval');
+        }
       }
 
       res.json({

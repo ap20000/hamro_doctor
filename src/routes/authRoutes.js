@@ -25,12 +25,24 @@ const router = express.Router();
  *               email: {type: string}
  *               phone: {type: string}
  *               password: {type: string}
- *               role: {type: string, enum: [patient, doctor]}
+ *               role: {type: string, enum: [patient, doctor, hospital]}
  *     responses:
  *       201:
  *         description: User registered
  */
 router.post('/register', register);
+
+/**
+ * @swagger
+ * /api/v1/auth/profile:
+ *   put:
+ *     summary: Update profile during onboarding
+ *     tags: [Auth]
+ *     security:
+ *       - bearerAuth: []
+ */
+import { updateProfile } from '../controllers/userController.js';
+router.put('/profile', protect, updateProfile);
 
 /**
  * @swagger

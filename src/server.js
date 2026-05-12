@@ -1,6 +1,4 @@
 import http from 'http';
-import https from 'https';
-import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { Server } from 'socket.io';
@@ -16,21 +14,9 @@ const __dirname = path.dirname(__filename);
 // Connect to Database
 connectDB();
 
-let server;
-const certPath = path.join(__dirname, '../../certs/cert.pem');
-const keyPath = path.join(__dirname, '../../certs/key.pem');
-
-if (fs.existsSync(certPath) && fs.existsSync(keyPath)) {
-  const options = {
-    key: fs.readFileSync(keyPath),
-    cert: fs.readFileSync(certPath),
-  };
-  server = https.createServer(options, app);
-  console.log('HTTPS Server initialized');
-} else {
-  server = http.createServer(app);
-  console.log('HTTP Server initialized (SSL certs not found)');
-}
+// Use HTTP for local testing
+const server = http.createServer(app);
+console.log('HTTP Server initialized for local testing');
 
 // Socket.io Setup
 const io = new Server(server, {
@@ -91,10 +77,9 @@ io.on('connection', (socket) => {
 const PORT = process.env.PORT || 5000;
 
 server.listen(PORT, '0.0.0.0', () => {
-  const protocol = server instanceof https.Server ? 'https' : 'http';
-  console.log(`Server running in ${process.env.NODE_ENV} mode`);
-  console.log(`- Local:   ${protocol}://localhost:${PORT}`);
-  console.log(`- Network: ${protocol}://192.168.110.29:${PORT}`);
+  console.log(`Server running in ${process.env.NODE_ENV || 'development'} mode`);
+  console.log(`- Local:   http://localhost:${PORT}`);
+  console.log(`- Network: http://192.168.110.29:${PORT}`);
 });
 
 export { io };

@@ -30,7 +30,7 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ['patient', 'doctor', 'hospital', 'pharmaceutical', 'surgical', 'admin'],
+      enum: ['patient', 'doctor', 'hospital', 'pharmaceutical', 'surgical', 'admin', 'nurse'],
       required: true,
     },
     isVerified: {
@@ -123,6 +123,11 @@ const userSchema = new mongoose.Schema(
           type: mongoose.Schema.Types.ObjectId,
           ref: 'User'
         },
+        status: {
+          type: String,
+          enum: ['pending', 'approved', 'rejected'],
+          default: 'pending'
+        },
         opdRate: Number,
         availability: [{
           day: String,
@@ -166,6 +171,10 @@ const userSchema = new mongoose.Schema(
     },
     googleId: String,
     facebookId: String,
+    associatedHospital: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User'
+    },
   },
   {
     timestamps: true,
