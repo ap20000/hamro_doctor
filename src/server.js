@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import { Server } from 'socket.io';
 import app from './app.js';
 import connectDB from './config/db.js';
+import seedAdmin from './utils/seedAdmin.js';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -12,7 +13,12 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Connect to Database
-connectDB();
+const startServer = async () => {
+  await connectDB();
+  await seedAdmin(); // Check and create admin if missing
+};
+
+startServer();
 
 // Use HTTP for local testing
 const server = http.createServer(app);
