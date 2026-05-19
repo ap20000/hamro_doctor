@@ -45,6 +45,10 @@ export const getMyPrescriptions = async (req, res, next) => {
       ? { patient: req.user._id } 
       : { doctor: req.user._id };
 
+    if (req.query.consultationId) {
+      query.consultation = req.query.consultationId;
+    }
+
     const prescriptions = await Prescription.find(query)
       .populate('doctor', 'name doctorDetails')
       .populate('patient', 'name profile');
