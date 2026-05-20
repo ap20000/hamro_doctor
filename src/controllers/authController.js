@@ -1,6 +1,7 @@
 import User from '../models/User.js';
 import { generateToken } from '../utils/generateToken.js';
 import { sendSMS } from '../utils/smsService.js';
+import { sendEmail } from '../utils/sendEmail.js';
 
 // @desc    Register user
 // @route   POST /api/v1/auth/register
@@ -177,22 +178,77 @@ export const getMe = async (req, res, next) => {
   }
 };
 
-// @desc    Forgot Password (Send OTP to Phone)
+// Helper to mask email
+const maskEmail = (email) => {
+  if (!email) return '';
+  const [local, domain] = email.split('@');
+  if (local.length <= 2) return `${local[0]}***@${domain}`;
+  return `${local[0]}${'*'.repeat(local.length - 2)}${local[local.length - 1]}@${domain}`;
+};
+
+// Helper to mask phone
+const maskPhone = (phone) => {
+  if (!phone) return '';
+  if (phone.length <= 4) return '****';
+  return `${phone.slice(0, 2)}${'*'.repeat(phone.length - 5)}${phone.slice(-3)}`;
+};
+
+// @desc    Forgot Password (Multi-step: Detect user, send OTP via Email/SMS)
 // @route   POST /api/v1/auth/forgot-password
 // @access  Public
 export const forgotPassword = async (req, res, next) => {
   try {
-    const { phone } = req.body;
+    const { loginId, method } = req.body;
 
-    const user = await User.findOne({ phone });
+    if (!loginId) {
+      res.status(400);
+      throw new Error('Please provide email or phone number');
+    }
+
+    // Find user (by email or phone or username)
+    const user = await User.findOne({
+      $or: [{ email: loginId }, { phone: loginId }, { username: loginId }]
+    });
+
     if (!user) {
       res.status(404);
-      throw new Error('No user found with this phone number');
+      throw new Error('No account found with this email or phone number');
+    }
+
+    // STEP 1: Account Detection (if method is not provided)
+    if (!method) {
+      const methods = [];
+      if (user.email) methods.push('email');
+      if (user.phone) methods.push('phone');
+
+      return res.status(200).json({
+        success: true,
+        step: 'detect',
+        methods,
+        maskedEmail: user.email ? maskEmail(user.email) : '',
+        maskedPhone: user.phone ? maskPhone(user.phone) : ''
+      });
+    }
+
+    // STEP 2: Send OTP via chosen method
+    if (!['email', 'phone'].includes(method)) {
+      res.status(400);
+      throw new Error('Invalid verification method chosen');
+    }
+
+    if (method === 'email' && !user.email) {
+      res.status(400);
+      throw new Error('Selected email method, but no email is linked to this account');
+    }
+
+    if (method === 'phone' && !user.phone) {
+      res.status(400);
+      throw new Error('Selected phone method, but no phone number is linked to this account');
     }
 
     // Generate OTP
     const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpireAt = new Date(Date.now() + process.env.OTP_EXPIRE * 60000);
+    const otpExpireAt = new Date(Date.now() + (process.env.OTP_EXPIRE || 10) * 60000);
 
     user.otp = {
       code: otpCode,
@@ -200,37 +256,76 @@ export const forgotPassword = async (req, res, next) => {
     };
     await user.save();
 
-    // Send SMS
-    const message = `Your Hamro Doctor password reset OTP is ${otpCode}. It expires in ${process.env.OTP_EXPIRE} minutes.`;
-    console.log(`[DEBUG] Password Reset OTP for ${phone}: ${otpCode}`);
-    await sendSMS(phone, message);
+    const message = `Your Hamro Doctor password reset OTP is ${otpCode}. It expires in ${process.env.OTP_EXPIRE || 10} minutes.`;
 
-    res.json({
+    if (method === 'email') {
+      // Print OTP in terminal
+      console.log(`\n======================================================`);
+      console.log(`[FORGOT PASSWORD OTP] Sent to Email (${user.email}): ${otpCode}`);
+      console.log(`======================================================\n`);
+
+      try {
+        await sendEmail({
+          email: user.email,
+          subject: 'Hamro Doctor - Password Reset Code',
+          message,
+          html: `<div style="font-family: Arial, sans-serif; padding: 20px; color: #333;">
+            <h2 style="color: #0D47A1;">Password Reset Verification</h2>
+            <p>You requested to reset your password. Use the verification code below:</p>
+            <div style="background-color: #EEF5FF; padding: 15px; border-radius: 8px; font-size: 24px; font-weight: bold; letter-spacing: 5px; text-align: center; color: #1E88E5; margin: 20px 0;">
+              ${otpCode}
+            </div>
+            <p>This code will expire in ${process.env.OTP_EXPIRE || 10} minutes.</p>
+            <p>If you did not request this, please ignore this email.</p>
+          </div>`
+        });
+      } catch (mailErr) {
+        console.error('SMTP Email dispatch failed:', mailErr.message);
+        // Do not fail hard, proceed so development is not blocked
+      }
+    } else {
+      // Print OTP in terminal
+      console.log(`\n======================================================`);
+      console.log(`[FORGOT PASSWORD OTP] Sent to Phone (${user.phone}): ${otpCode}`);
+      console.log(`======================================================\n`);
+
+      await sendSMS(user.phone, message);
+    }
+
+    res.status(200).json({
       success: true,
-      message: 'Password reset OTP sent to your phone',
+      step: 'send',
+      message: `Password reset verification code sent via ${method}`,
     });
   } catch (error) {
     next(error);
   }
 };
 
-// @desc    Reset Password
+// @desc    Reset Password (using loginId instead of phone only)
 // @route   POST /api/v1/auth/reset-password
 // @access  Public
 export const resetPassword = async (req, res, next) => {
   try {
-    const { phone, code, newPassword } = req.body;
+    const { loginId, code, newPassword } = req.body;
 
-    const user = await User.findOne({ phone });
+    if (!loginId || !code || !newPassword) {
+      res.status(400);
+      throw new Error('Please provide login ID, verification code, and new password');
+    }
+
+    const user = await User.findOne({
+      $or: [{ email: loginId }, { phone: loginId }, { username: loginId }]
+    });
 
     if (!user) {
       res.status(404);
       throw new Error('User not found');
     }
 
-    if (user.otp.code !== code || user.otp.expireAt < Date.now()) {
+    if (!user.otp || user.otp.code !== code || user.otp.expireAt < Date.now()) {
       res.status(400);
-      throw new Error('Invalid or expired OTP');
+      throw new Error('Invalid or expired verification code');
     }
 
     // Update password
@@ -239,7 +334,7 @@ export const resetPassword = async (req, res, next) => {
     user.otp.expireAt = undefined;
     await user.save();
 
-    res.json({
+    res.status(200).json({
       success: true,
       message: 'Password reset successful. You can now login with your new password.',
     });
@@ -247,4 +342,5 @@ export const resetPassword = async (req, res, next) => {
     next(error);
   }
 };
+
 
