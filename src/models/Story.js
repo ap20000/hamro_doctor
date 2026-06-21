@@ -13,7 +13,7 @@ const storySchema = new mongoose.Schema(
     },
     content: {
       type: String,
-      required: true,
+      default: '',
     },
     image: String,
     category: {

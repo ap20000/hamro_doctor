@@ -1,6 +1,7 @@
 import User from '../models/User.js';
 import Article from '../models/Article.js';
 import Comment from '../models/Comment.js';
+import Story from '../models/Story.js';
 
 // @desc    Get all users with filters
 // @route   GET /api/v1/admin/users
@@ -148,6 +149,48 @@ export const deleteAdminArticle = async (req, res, next) => {
     res.json({
       success: true,
       message: 'Article and associated comments deleted successfully'
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get all stories with author details populated
+// @route   GET /api/v1/admin/stories
+// @access  Private/Admin
+export const getAdminStories = async (req, res, next) => {
+  try {
+    const stories = await Story.find()
+      .populate('author', 'name profile doctorDetails')
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      count: stories.length,
+      stories
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Delete story by Admin
+// @route   DELETE /api/v1/admin/stories/:id
+// @access  Private/Admin
+export const deleteAdminStory = async (req, res, next) => {
+  try {
+    const story = await Story.findById(req.params.id);
+
+    if (!story) {
+      res.status(404);
+      throw new Error('Story not found');
+    }
+
+    await Story.findByIdAndDelete(req.params.id);
+
+    res.json({
+      success: true,
+      message: 'Story deleted successfully'
     });
   } catch (error) {
     next(error);
