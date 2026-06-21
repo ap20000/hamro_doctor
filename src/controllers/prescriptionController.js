@@ -36,14 +36,34 @@ export const createPrescription = async (req, res, next) => {
   }
 };
 
-// @desc    Get my prescriptions
+// @desc    Get prescriptions (Admin can view all, hospital admin can view doctor-linked prescriptions, patient/doctor see their own)
 // @route   GET /api/v1/prescriptions
 // @access  Private
 export const getMyPrescriptions = async (req, res, next) => {
   try {
-    const query = req.user.role === 'patient' 
-      ? { patient: req.user._id } 
-      : { doctor: req.user._id };
+    let query = {};
+    
+    if (req.user.role === 'patient') {
+      query = { patient: req.user._id };
+    } else if (req.user.role === 'doctor') {
+      query = { doctor: req.user._id };
+    } else if (req.user.role === 'hospital') {
+      const hospital = await User.findById(req.user._id);
+      const enrolledDoctorIds = hospital?.hospitalDetails?.doctors?.map(d => d.doctor) || [];
+      const associatedDoctors = await User.find({ associatedHospital: req.user._id }).select('_id');
+      const associatedDoctorIds = associatedDoctors.map(d => d._id);
+      
+      const allHospitalDoctorIds = [...new Set([
+        ...enrolledDoctorIds.map(id => id.toString()), 
+        ...associatedDoctorIds.map(id => id.toString())
+      ])];
+      
+      query = { doctor: { $in: allHospitalDoctorIds } };
+    } else if (req.user.role === 'admin') {
+      query = {}; // Admin can see all prescriptions
+    } else {
+      query = { _id: null }; // Other roles return empty by default
+    }
 
     if (req.query.consultationId) {
       query.consultation = req.query.consultationId;
@@ -51,7 +71,8 @@ export const getMyPrescriptions = async (req, res, next) => {
 
     const prescriptions = await Prescription.find(query)
       .populate('doctor', 'name doctorDetails')
-      .populate('patient', 'name profile');
+      .populate('patient', 'name profile')
+      .sort({ createdAt: -1 });
 
     res.json({
       success: true,

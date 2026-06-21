@@ -3,6 +3,7 @@ import Consultation from '../models/Consultation.js';
 import Article from '../models/Article.js';
 import Story from '../models/Story.js';
 import Transaction from '../models/Transaction.js';
+import Comment from '../models/Comment.js';
 
 // @desc    Get doctor dashboard stats
 // @route   GET /api/v1/doctor/dashboard
@@ -15,15 +16,18 @@ export const getDashboardStats = async (req, res, next) => {
       consultationsCount,
       articlesCount,
       storiesCount,
-      transactions
+      transactions,
+      articlesList
     ] = await Promise.all([
       Consultation.countDocuments({ doctor: doctorId }),
       Article.countDocuments({ author: doctorId }),
       Story.countDocuments({ author: doctorId }),
-      Transaction.find({ doctor: doctorId })
+      Transaction.find({ doctor: doctorId }),
+      Article.find({ author: doctorId }).select('views')
     ]);
 
     const netEarnings = transactions.reduce((acc, curr) => acc + curr.netAmount, 0);
+    const articleViews = articlesList.reduce((acc, curr) => acc + (curr.views || 0), 0);
 
     const doctor = await User.findById(doctorId).select('doctorDetails.stats');
 
@@ -34,7 +38,8 @@ export const getDashboardStats = async (req, res, next) => {
         articlesPublished: articlesCount,
         noOfStories: storiesCount,
         netEarnings,
-        ...doctor.doctorDetails.stats
+        ...doctor.doctorDetails.stats,
+        articleViews // Override static stats with dynamically calculated views sum
       }
     });
   } catch (error) {
@@ -306,6 +311,32 @@ export const updateProfile = async (req, res, next) => {
       success: true,
       message: 'Profile updated successfully',
       user
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get all comments on articles written by the logged-in doctor
+// @route   GET /api/v1/doctor/article-comments
+// @access  Private (Doctor)
+export const getDoctorArticleComments = async (req, res, next) => {
+  try {
+    const doctorId = req.user._id;
+
+    // Find all articles written by this doctor
+    const articles = await Article.find({ author: doctorId }).select('_id title content');
+    const articleIds = articles.map(art => art._id);
+
+    // Find all comments on these articles
+    const comments = await Comment.find({ article: { $in: articleIds } })
+      .populate('author', 'name profile role doctorDetails')
+      .populate('article', 'title content')
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      comments
     });
   } catch (error) {
     next(error);

@@ -1,4 +1,5 @@
 import Article from '../models/Article.js';
+import jwt from 'jsonwebtoken';
 
 // @desc    Create new article
 // @route   POST /api/v1/articles
@@ -64,21 +65,47 @@ export const getArticles = async (req, res, next) => {
   }
 };
 
-// @desc    Get single article and increment views
+// @desc    Get single article and increment views uniquely
 // @route   GET /api/v1/articles/:id
 // @access  Public
 export const getArticle = async (req, res, next) => {
   try {
-    const article = await Article.findByIdAndUpdate(
-      req.params.id,
-      { $inc: { views: 1 } },
-      { new: true }
-    ).populate('author', 'name profile doctorDetails');
+    let article = await Article.findById(req.params.id);
 
     if (!article) {
       res.status(404);
       throw new Error('Article not found');
     }
+
+    let visitorKey = req.ip || req.headers['x-forwarded-for'] || req.socket.remoteAddress;
+
+    // Optional user authentication from authorization header
+    if (req.headers.authorization && req.headers.authorization.startsWith('Bearer')) {
+      try {
+        const token = req.headers.authorization.split(' ')[1];
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        if (decoded && decoded.id) {
+          visitorKey = decoded.id.toString();
+        }
+      } catch (err) {
+        // Fallback to IP address on token verify error
+      }
+    }
+
+    // Ensure viewedBy is initialized
+    if (!article.viewedBy) {
+      article.viewedBy = [];
+    }
+
+    // If this visitor key hasn't viewed the article, add it and update views count
+    if (!article.viewedBy.includes(visitorKey)) {
+      article.viewedBy.push(visitorKey);
+      article.views = article.viewedBy.length;
+      await article.save();
+    }
+
+    // Populate author details
+    await article.populate('author', 'name profile doctorDetails');
 
     res.json({
       success: true,

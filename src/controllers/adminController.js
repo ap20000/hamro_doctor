@@ -1,4 +1,6 @@
 import User from '../models/User.js';
+import Article from '../models/Article.js';
+import Comment from '../models/Comment.js';
 
 // @desc    Get all users with filters
 // @route   GET /api/v1/admin/users
@@ -81,6 +83,71 @@ export const onboardUser = async (req, res, next) => {
     res.status(201).json({
       success: true,
       user,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get all articles with search (by title or doctor name)
+// @route   GET /api/v1/admin/articles
+// @access  Private/Admin
+export const getAdminArticles = async (req, res, next) => {
+  try {
+    const { search } = req.query;
+    let query = {};
+
+    if (search) {
+      // Find doctors whose name matches the search term
+      const matchingDoctors = await User.find({
+        role: 'doctor',
+        name: { $regex: search, $options: 'i' }
+      }).select('_id');
+      const authorIds = matchingDoctors.map(doc => doc._id);
+
+      query = {
+        $or: [
+          { title: { $regex: search, $options: 'i' } },
+          { author: { $in: authorIds } }
+        ]
+      };
+    }
+
+    const articles = await Article.find(query)
+      .populate('author', 'name profile doctorDetails')
+      .sort({ createdAt: -1 });
+
+    res.json({
+      success: true,
+      count: articles.length,
+      articles
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Delete article and associated comments by Admin
+// @route   DELETE /api/v1/admin/articles/:id
+// @access  Private/Admin
+export const deleteAdminArticle = async (req, res, next) => {
+  try {
+    const article = await Article.findById(req.params.id);
+
+    if (!article) {
+      res.status(404);
+      throw new Error('Article not found');
+    }
+
+    // Delete associated comments
+    await Comment.deleteMany({ article: req.params.id });
+
+    // Delete the article
+    await Article.findByIdAndDelete(req.params.id);
+
+    res.json({
+      success: true,
+      message: 'Article and associated comments deleted successfully'
     });
   } catch (error) {
     next(error);

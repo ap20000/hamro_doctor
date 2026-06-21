@@ -140,14 +140,57 @@ export const updateHospitalProfile = async (req, res, next) => {
 export const getHospitalUsers = async (req, res, next) => {
   try {
     const { role } = req.query;
-    const query = { associatedHospital: req.user._id };
-    if (role) query.role = role;
+    
+    // Get all doctor IDs who have an approved link status with this hospital
+    const hospital = await User.findById(req.user._id);
+    const approvedLinkDoctorIds = hospital?.hospitalDetails?.doctors
+      ?.filter(d => d.status === 'approved')
+      ?.map(d => d.doctor) || [];
+
+    let query = {};
+    if (role) {
+      if (role === 'doctor') {
+        query = {
+          role: 'doctor',
+          $or: [
+            { associatedHospital: req.user._id },
+            { _id: { $in: approvedLinkDoctorIds } }
+          ]
+        };
+      } else {
+        query = { associatedHospital: req.user._id, role };
+      }
+    } else {
+      // Fetching all roles combined
+      query = {
+        $or: [
+          { associatedHospital: req.user._id },
+          { _id: { $in: approvedLinkDoctorIds }, role: 'doctor' }
+        ]
+      };
+    }
 
     const users = await User.find(query).sort('-createdAt');
+
+    // Attach joinMethod metadata
+    const usersWithSource = users.map(user => {
+      const userObj = user.toObject();
+      if (user.role === 'doctor') {
+        if (user.associatedHospital && user.associatedHospital.toString() === req.user._id.toString()) {
+          userObj.joinMethod = 'Added by Hospital Admin';
+        } else {
+          userObj.joinMethod = 'Joined through Link Request';
+        }
+      } else {
+        userObj.joinMethod = 'Added by Hospital Admin';
+      }
+      return userObj;
+    });
+
     res.json({
       success: true,
-      count: users.length,
-      users,
+      count: usersWithSource.length,
+      users: usersWithSource,
     });
   } catch (error) {
     next(error);

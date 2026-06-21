@@ -8,7 +8,8 @@ import {
   updateOpdTime,
   removeHospital,
   getEarningsReport,
-  updateProfile
+  updateProfile,
+  getDoctorArticleComments
 } from '../controllers/doctorController.js';
 import { protect, authorize } from '../middleware/authMiddleware.js';
 
@@ -182,5 +183,16 @@ router.get('/earnings', getEarningsReport);
  *       - bearerAuth: []
  */
 router.put('/profile', updateProfile);
+
+/**
+ * @swagger
+ * /api/v1/doctor/article-comments:
+ *   get:
+ *     summary: Get all comments on articles written by the logged-in doctor
+ *     tags: [Doctor]
+ *     security:
+ *       - bearerAuth: []
+ */
+router.get('/article-comments', getDoctorArticleComments);
 
 export default router;
