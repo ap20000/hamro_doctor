@@ -24,8 +24,13 @@ import surgicalRoutes from './routes/surgicalRoutes.js';
 import adminRoutes from './routes/adminRoutes.js';
 import marketingRoutes from './routes/marketingRoutes.js';
 import newsRoutes from './routes/newsRoutes.js';
+import chatbotRoutes from './routes/chatbotRoutes.js';
 
 dotenv.config();
+
+// Validate LLM provider configurations
+import { checkLLMConfig } from './services/llmService.js';
+checkLLMConfig();
 
 const app = express();
 
@@ -102,6 +107,7 @@ app.use('/api/v1/surgical', surgicalRoutes);
 app.use('/api/v1/admin', adminRoutes);
 app.use('/api/v1/marketing', marketingRoutes);
 app.use('/api/v1/news', newsRoutes);
+app.use('/api/v1/chatbot', chatbotRoutes);
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {
