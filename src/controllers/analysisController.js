@@ -2,6 +2,7 @@ import fs from 'fs';
 import extractText from '../services/analysis/extractText.js';
 import detectDiseases from '../services/analysis/diseaseDetect.js';
 import detectMedicines from '../services/analysis/medicineDetect.js';
+import openRouterVision from '../services/vision/openRouterVision.js';
 
 /**
  * Validates uploaded file presence.
@@ -21,45 +22,7 @@ const validateFile = (req, res) => {
     return true;
 };
 
-/**
- * Extracts text from an uploaded document or image.
- * 
- * @route POST /api/v1/analysis/ocr
- */
-export const extractTextController = async (req, res, next) => {
-    try {
-        if (!validateFile(req, res)) return;
 
-        // User context is available at req.user._id (from protect middleware)
-        const userId = req.user._id;
-
-        const text = await extractText(req.file);
-
-        // Delete file after extraction to save disk space
-        if (req.file.path && fs.existsSync(req.file.path)) {
-            fs.unlinkSync(req.file.path);
-        }
-
-        if (!text) {
-            return res.status(204).json({
-                success: true,
-                message: 'No text extracted from the file.',
-            });
-        }
-
-        res.status(200).json({
-            success: true,
-            extractedText: text,
-            user: userId
-        });
-    } catch (error) {
-        // Ensure file is deleted even if error occurs
-        if (req.file && req.file.path && fs.existsSync(req.file.path)) {
-            fs.unlinkSync(req.file.path);
-        }
-        next(error);
-    }
-};
 
 /**
  * Extracts text and detects diseases and medicines.
@@ -98,6 +61,45 @@ export const detectController = async (req, res, next) => {
             user: userId
         });
     } catch (error) {
+        if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
+        next(error);
+    }
+};
+
+/**
+ * Extracts text using OpenRouter Vision model.
+ *
+ * @route POST /api/v1/analysis/vision-ocr
+ */
+export const visionOcrController = async (req, res, next) => {
+    try {
+        if (!validateFile(req, res)) return;
+
+        if (!req.file.mimetype.startsWith('image/')) {
+            if (req.file.path && fs.existsSync(req.file.path)) {
+                fs.unlinkSync(req.file.path);
+            }
+            return res.status(400).json({
+                success: false,
+                message: 'Vision OCR only supports image files.',
+            });
+        }
+
+        const text = await openRouterVision(req.file);
+
+        // Delete file after extraction to save disk space
+        if (req.file.path && fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
+
+        res.status(200).json({
+            success: true,
+            extractedText: text,
+        });
+    } catch (error) {
+        // Ensure file is deleted even if error occurs
         if (req.file && req.file.path && fs.existsSync(req.file.path)) {
             fs.unlinkSync(req.file.path);
         }

@@ -1,7 +1,7 @@
 import path from "path";
 import extractPdf from "./extractPdf.js";
-import extractImage from "./extractImage.js";
 import extractTextFile from "./extractTextFile.js";
+import openRouterVision from "../vision/openRouterVision.js";
 
 /**
  * Extracts text from uploaded files based on file type.
@@ -26,7 +26,7 @@ async function extractText(file) {
         case ".png":
         case ".webp":
         case ".gif":
-            return extractImage(file.path);
+            return openRouterVision(file);
 
         default:
             throw new Error("Unsupported file type");
