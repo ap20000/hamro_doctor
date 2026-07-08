@@ -5,6 +5,7 @@ import Consultation from '../models/Consultation.js';
 import fs from 'fs';
 import { analyzeMedicalDocument } from '../services/analysis/medicalAnalysisService.js';
 import mongoose from 'mongoose';
+import crypto from 'crypto';
 
 const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
@@ -99,6 +100,14 @@ General Guidelines:
 - Be helpful, polite, and empathetic.
 - When displaying doctors, display their unique ID (ObjectId) clearly so the user can use it to request a consultation.
 - If a patient asks for physical appointments, clarify that they are managed directly by individual hospitals. Offer to help them initiate an online digital consultation instead.
+
+Medical Document Context Rules (CRITICAL):
+If the user prompt includes a [MedicalContext] block:
+- The MedicalContext is the ABSOLUTE source of truth.
+- Never infer medicine names from OCR text directly.
+- Never rerun OCR reasoning or regenerate medicine extraction.
+- If the answer to the user's question is not explicitly available inside the structured MedicalContext (e.g. missing dose, frequency, or duration), you must clearly state: "The uploaded prescription does not specify that information."
+- Do not invent timings, dosage or duration under any circumstances.
 `;
 
 // Tool specifications (Gemini Function Calling Schema)
@@ -463,7 +472,7 @@ async function handleLocalIntentAndRules(message, patientId) {
 
 export const chatWithBot = async (req, res, next) => {
   try {
-    const { message, imageBase64 } = req.body;
+    let { message, imageBase64 } = req.body;
     const patientId = req.user._id;
 
     if (!message && !imageBase64) {
@@ -478,40 +487,84 @@ export const chatWithBot = async (req, res, next) => {
     }
 
     let medicalAnalysis = null;
+    let isCacheHit = false;
+
     if (imageBase64) {
-      // Create a mock file object for analyzeMedicalDocument
-      // Assuming imageBase64 is a data URL like "data:image/jpeg;base64,..."
-      let mimeType = 'image/jpeg';
-      if (imageBase64.startsWith('data:')) {
-        mimeType = imageBase64.split(';')[0].split(':')[1];
+      // 1. Generate SHA-256 hash of the uploaded image
+      const documentHash = crypto.createHash('sha256').update(imageBase64).digest('hex');
+      console.log(`[MedicalContext] SHA-256 generated: ${documentHash.substring(0, 16)}...`);
+
+      // 2. Cache Lookup
+      if (session.medicalContext && session.medicalContext.documentHash === documentHash) {
+        console.log('[MedicalContext] Cache hit');
+        medicalAnalysis = session.medicalContext;
+        isCacheHit = true;
+      } else {
+        console.log('[MedicalContext] Cache miss');
+        console.log('[MedicalContext] Running Vision OCR');
+        console.log('[MedicalContext] Running OpenMed');
+
+        // Create a mock file object for analyzeMedicalDocument
+        let mimeType = 'image/jpeg';
+        if (imageBase64.startsWith('data:')) {
+          mimeType = imageBase64.split(';')[0].split(':')[1];
+        }
+
+        const mockFile = {
+          base64: imageBase64,
+          mimetype: mimeType,
+        };
+
+        const analysisResult = await analyzeMedicalDocument(mockFile);
+        
+        medicalAnalysis = {
+          documentHash,
+          ocrText: analysisResult.extractedText,
+          diseases: analysisResult.diseases,
+          medicines: analysisResult.medicines,
+          explanation: analysisResult.explanation
+        };
+
+        // Save new context to ChatbotSession
+        session.medicalContext = medicalAnalysis;
+        console.log('[MedicalContext] Saved to ChatbotSession');
       }
-
-      const mockFile = {
-        base64: imageBase64,
-        mimetype: mimeType,
-      };
-
-      medicalAnalysis = await analyzeMedicalDocument(mockFile);
+    } else if (message) {
+      // Flow for text messages: Load cached MedicalContext if it exists
+      if (session.medicalContext) {
+        console.log('[MedicalContext] Loaded from cache');
+        medicalAnalysis = session.medicalContext;
+      }
     }
 
+    let isImageOnlyCacheHit = false;
+
     if (imageBase64 && !message) {
-      // Flow 2: Image Only
-      session.messages.push({ 
-        sender: 'user', 
-        text: '[Uploaded Medical Document]',
-        attachment: imageBase64 
-      });
-      session.messages.push({ sender: 'bot', text: medicalAnalysis.explanation });
-      await session.save();
-      return res.json({
-        success: true,
-        reply: medicalAnalysis.explanation,
-        messages: session.messages
-      });
+      if (medicalAnalysis.explanation) {
+        // Flow 2 (Cache Miss): We have the pre-generated explanation from MedicalAnalysisService
+        session.messages.push({ 
+          sender: 'user', 
+          text: '[Uploaded Medical Document]',
+          attachment: imageBase64 
+        });
+        session.messages.push({ sender: 'bot', text: medicalAnalysis.explanation });
+        await session.save();
+        return res.json({
+          success: true,
+          reply: medicalAnalysis.explanation,
+          messages: session.messages
+        });
+      } else {
+        // Flow 2 (Cache Hit): No cached explanation, we must generate one via LLM.
+        message = "Please analyze and explain the contents of this medical document in simple terms.";
+        isImageOnlyCacheHit = true;
+      }
     }
 
     // Flow 1 & 3: We have a text message (and optionally an image)
-    const userTextToSave = imageBase64 ? `${message}\n\n*(Attached Medical Document)*` : message;
+    const userTextToSave = isImageOnlyCacheHit 
+      ? '[Uploaded Medical Document]' 
+      : (imageBase64 ? `${message}\n\n*(Attached Medical Document)*` : message);
     
     // 2. Append user message to logs
     session.messages.push({ 
@@ -540,9 +593,9 @@ export const chatWithBot = async (req, res, next) => {
     }));
 
     // Flow 3: Inject medical context dynamically into the final user prompt
-    if (imageBase64 && message && medicalAnalysis) {
+    if (message && medicalAnalysis) {
       const lastUserMsgIndex = messages.length - 1;
-      const enrichedContent = `I have uploaded a medical document. Here is the extracted data:\n[Document Data]\nDiseases: ${JSON.stringify(medicalAnalysis.diseases)}\nMedicines: ${JSON.stringify(medicalAnalysis.medicines)}\nGeneral Explanation: ${medicalAnalysis.explanation}\n[End Document Data]\n\nMy question is: ${message}`;
+      const enrichedContent = `[MedicalContext]\nDiseases: ${JSON.stringify(medicalAnalysis.diseases)}\nMedicines: ${JSON.stringify(medicalAnalysis.medicines)}\n[End MedicalContext]\n\nMy question is: ${message}`;
       messages[lastUserMsgIndex].content = enrichedContent;
     }
 

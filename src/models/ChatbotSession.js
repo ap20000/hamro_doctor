@@ -29,6 +29,16 @@ const chatbotSessionSchema = new mongoose.Schema(
         },
       },
     ],
+    medicalContext: {
+      documentHash: String,
+      ocrText: String,
+      diseases: mongoose.Schema.Types.Mixed,
+      medicines: mongoose.Schema.Types.Mixed,
+      createdAt: {
+        type: Date,
+        default: Date.now,
+      }
+    }
   },
   {
     timestamps: true,
