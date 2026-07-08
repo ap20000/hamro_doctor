@@ -2,6 +2,8 @@ import axios from 'axios';
 import ChatbotSession from '../models/ChatbotSession.js';
 import User from '../models/User.js';
 import Consultation from '../models/Consultation.js';
+import fs from 'fs';
+import { analyzeMedicalDocument } from '../services/analysis/medicalAnalysisService.js';
 import mongoose from 'mongoose';
 
 const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -461,12 +463,12 @@ async function handleLocalIntentAndRules(message, patientId) {
 
 export const chatWithBot = async (req, res, next) => {
   try {
-    const { message } = req.body;
+    const { message, imageBase64 } = req.body;
     const patientId = req.user._id;
 
-    if (!message) {
+    if (!message && !imageBase64) {
       res.status(400);
-      throw new Error('Message content is required');
+      throw new Error('Message content or image is required');
     }
 
     // 1. Fetch or create chatbot session
@@ -475,8 +477,48 @@ export const chatWithBot = async (req, res, next) => {
       session = await ChatbotSession.create({ patient: patientId, messages: [] });
     }
 
+    let medicalAnalysis = null;
+    if (imageBase64) {
+      // Create a mock file object for analyzeMedicalDocument
+      // Assuming imageBase64 is a data URL like "data:image/jpeg;base64,..."
+      let mimeType = 'image/jpeg';
+      if (imageBase64.startsWith('data:')) {
+        mimeType = imageBase64.split(';')[0].split(':')[1];
+      }
+
+      const mockFile = {
+        base64: imageBase64,
+        mimetype: mimeType,
+      };
+
+      medicalAnalysis = await analyzeMedicalDocument(mockFile);
+    }
+
+    if (imageBase64 && !message) {
+      // Flow 2: Image Only
+      session.messages.push({ 
+        sender: 'user', 
+        text: '[Uploaded Medical Document]',
+        attachment: imageBase64 
+      });
+      session.messages.push({ sender: 'bot', text: medicalAnalysis.explanation });
+      await session.save();
+      return res.json({
+        success: true,
+        reply: medicalAnalysis.explanation,
+        messages: session.messages
+      });
+    }
+
+    // Flow 1 & 3: We have a text message (and optionally an image)
+    const userTextToSave = imageBase64 ? `${message}\n\n*(Attached Medical Document)*` : message;
+    
     // 2. Append user message to logs
-    session.messages.push({ sender: 'user', text: message });
+    session.messages.push({ 
+      sender: 'user', 
+      text: userTextToSave,
+      attachment: imageBase64 || undefined
+    });
 
     // Check if it matches a local intent or symptom rule to bypass Gemini API entirely
     const localResult = await handleLocalIntentAndRules(message, patientId);
@@ -496,6 +538,13 @@ export const chatWithBot = async (req, res, next) => {
       role: m.sender === 'user' ? 'user' : 'assistant',
       content: m.text
     }));
+
+    // Flow 3: Inject medical context dynamically into the final user prompt
+    if (imageBase64 && message && medicalAnalysis) {
+      const lastUserMsgIndex = messages.length - 1;
+      const enrichedContent = `I have uploaded a medical document. Here is the extracted data:\n[Document Data]\nDiseases: ${JSON.stringify(medicalAnalysis.diseases)}\nMedicines: ${JSON.stringify(medicalAnalysis.medicines)}\nGeneral Explanation: ${medicalAnalysis.explanation}\n[End Document Data]\n\nMy question is: ${message}`;
+      messages[lastUserMsgIndex].content = enrichedContent;
+    }
 
     let botReplyText = '';
     try {

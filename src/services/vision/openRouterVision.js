@@ -4,12 +4,12 @@ import axios from 'axios';
 /**
  * Sends an uploaded image file to OpenRouter's vision API to transcribe its text.
  *
- * @param {Object} file - Multer file object containing path and mimetype.
+ * @param {Object} file - Object containing either `base64` (data URL) or `path` (local file path).
  * @returns {Promise<string>} Transcribed text from the image.
  */
 export default async function openRouterVision(file) {
-  if (!file || !file.path) {
-    throw new Error('Invalid file object provided for vision OCR.');
+  if (!file || (!file.path && !file.base64)) {
+    throw new Error('Invalid file object provided for vision OCR. Must provide path or base64.');
   }
 
   const apiKey = process.env.OPENROUTER_API_KEY;
@@ -20,11 +20,16 @@ export default async function openRouterVision(file) {
   const model = process.env.OPENROUTER_VISION_MODEL || 'google/gemma-4-31b-it';
   const openRouterUrl = 'https://openrouter.ai/api/v1/chat/completions';
 
-  // Read the file and convert to base64
-  const buffer = fs.readFileSync(file.path);
-  const base64Image = buffer.toString('base64');
-  const mimeType = file.mimetype || 'image/jpeg';
-  const dataUrl = `data:${mimeType};base64,${base64Image}`;
+  // Check if we already have the base64 data URL
+  let dataUrl;
+  if (file.base64) {
+    dataUrl = file.base64; // Expecting complete data URL (e.g., data:image/jpeg;base64,...)
+  } else {
+    const buffer = fs.readFileSync(file.path);
+    const base64Image = buffer.toString('base64');
+    const mimeType = file.mimetype || 'image/jpeg';
+    dataUrl = `data:${mimeType};base64,${base64Image}`;
+  }
 
   const payload = {
     model,

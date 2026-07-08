@@ -20,6 +20,9 @@ const chatbotSessionSchema = new mongoose.Schema(
           type: String,
           required: true,
         },
+        attachment: {
+          type: String, // Store base64 encoded image
+        },
         timestamp: {
           type: Date,
           default: Date.now,

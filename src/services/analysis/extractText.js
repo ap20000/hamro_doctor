@@ -12,6 +12,14 @@ import openRouterVision from "../vision/openRouterVision.js";
  * @returns {Promise<string>} Extracted text content.
  */
 async function extractText(file) {
+    if (file.base64 && file.mimetype?.startsWith('image/')) {
+        return openRouterVision(file);
+    }
+
+    if (!file.originalname) {
+        throw new Error("Invalid file object provided for extraction");
+    }
+
     const ext = path.extname(file.originalname).toLowerCase();
 
     switch (ext) {
