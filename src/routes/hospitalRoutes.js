@@ -73,9 +73,107 @@ router.patch('/appointments/:id', updateAppointmentStatus);
  */
 router.put('/profile', updateHospitalProfile);
 
+/**
+ * @swagger
+ * /api/v1/hospital/users:
+ *   get:
+ *     summary: Get all users linked to this hospital (staff/doctors/patients)
+ *     tags: [Hospital]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: role
+ *         schema:
+ *           type: string
+ *           enum: [doctor, patient, nurse]
+ *         description: Filter by role
+ *     responses:
+ *       200:
+ *         description: Success
+ */
 router.get('/users', getHospitalUsers);
+
+/**
+ * @swagger
+ * /api/v1/hospital/onboard:
+ *   post:
+ *     summary: Onboard user by Hospital
+ *     tags: [Hospital]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [name, username, email, phone, password, role]
+ *             properties:
+ *               name:
+ *                 type: string
+ *               username:
+ *                 type: string
+ *               email:
+ *                 type: string
+ *               phone:
+ *                 type: string
+ *               password:
+ *                 type: string
+ *               role:
+ *                 type: string
+ *                 enum: [doctor, patient, nurse]
+ *     responses:
+ *       201:
+ *         description: User onboarded successfully
+ */
 router.post('/onboard', onboardHospitalUser);
+
+/**
+ * @swagger
+ * /api/v1/hospital/link-requests:
+ *   get:
+ *     summary: Get hospital link requests from doctors
+ *     tags: [Hospital]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Success
+ */
 router.get('/link-requests', getHospitalLinkRequests);
+
+/**
+ * @swagger
+ * /api/v1/hospital/link-requests/{doctorId}:
+ *   patch:
+ *     summary: Approve or reject doctor link request
+ *     tags: [Hospital]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: doctorId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: MongoDB ObjectId of the doctor
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [status]
+ *             properties:
+ *               status:
+ *                 type: string
+ *                 enum: [approved, rejected]
+ *     responses:
+ *       200:
+ *         description: Doctor link request processed successfully
+ */
 router.patch('/link-requests/:doctorId', approveHospitalLink);
 
 export default router;
+

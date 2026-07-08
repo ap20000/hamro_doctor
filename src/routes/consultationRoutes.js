@@ -90,6 +90,32 @@ router.post('/start', startConsultation);
  *         description: Session started
  */
 router.post('/:id/session', startCallSession);
+
+/**
+ * @swagger
+ * /api/v1/consultations/{id}/session/{sessionId}/finish:
+ *   patch:
+ *     summary: Finish call session (updates actual end time)
+ *     tags: [Consultations]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Consultation ID
+ *       - in: path
+ *         name: sessionId
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: Session ID
+ *     responses:
+ *       200:
+ *         description: Session finished
+ */
 router.patch('/:id/session/:sessionId/finish', finishCallSession);
 
 /**
@@ -134,8 +160,46 @@ router.get('/', getMyConsultations);
  *         description: Responded successfully
  */
 router.patch('/:id/respond', respondToConsultation);
+
+/**
+ * @swagger
+ * /api/v1/consultations/{id}/complete:
+ *   patch:
+ *     summary: Complete consultation manually (Doctor only)
+ *     tags: [Consultations]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Consultation completed successfully
+ */
 router.patch('/:id/complete', completeConsultation);
 
+/**
+ * @swagger
+ * /api/v1/consultations/{id}:
+ *   get:
+ *     summary: Get single consultation details by ID
+ *     tags: [Consultations]
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Success
+ */
 router.get('/:id', getConsultationById);
 
 export default router;
+
