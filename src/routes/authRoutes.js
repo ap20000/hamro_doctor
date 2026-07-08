@@ -65,8 +65,64 @@ router.put('/profile', protect, updateProfile);
  *         description: OTP verified, returns token
  */
 router.post('/verify-otp', verifyOtp);
+
+/**
+ * @swagger
+ * /api/v1/auth/forgot-password:
+ *   post:
+ *     summary: Request password reset (OTP code via Email/SMS)
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [loginId]
+ *             properties:
+ *               loginId:
+ *                 type: string
+ *                 description: Email, Phone number, or Username
+ *                 example: "bsamyog14@gmail.com"
+ *               method:
+ *                 type: string
+ *                 enum: [email, phone]
+ *                 description: Omit for detection step, or specify to send OTP
+ *     responses:
+ *       200:
+ *         description: OTP sent or user detected
+ */
 router.post('/forgot-password', forgotPassword);
+
+/**
+ * @swagger
+ * /api/v1/auth/reset-password:
+ *   post:
+ *     summary: Reset password using verification OTP code
+ *     tags: [Auth]
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [loginId, code, newPassword]
+ *             properties:
+ *               loginId:
+ *                 type: string
+ *                 description: Email, Phone number, or Username
+ *               code:
+ *                 type: string
+ *                 description: 6-digit OTP code received
+ *               newPassword:
+ *                 type: string
+ *                 description: New password to set
+ *     responses:
+ *       200:
+ *         description: Password reset successful
+ */
 router.post('/reset-password', resetPassword);
+
 
 /**
  * @swagger

@@ -24,6 +24,17 @@ const router = express.Router();
  *         description: List of doctors
  */
 router.get('/doctors', getDoctors);
+
+/**
+ * @swagger
+ * /api/v1/users/hospitals:
+ *   get:
+ *     summary: Get all approved hospitals
+ *     tags: [Users]
+ *     responses:
+ *       200:
+ *         description: Success
+ */
 router.get('/hospitals', getHospitals); // Get all approved hospitals
 
 /**
@@ -71,10 +82,70 @@ router.put('/profile', protect, updateProfile);
  *         description: Returns BMI data
  */
 router.get('/bmi', protect, getBMI);
+
+/**
+ * @swagger
+ * /api/v1/users/avatar:
+ *   post:
+ *     summary: Update profile avatar with compression
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [image]
+ *             properties:
+ *               image:
+ *                 type: string
+ *                 description: Base64 encoded image string
+ *     responses:
+ *       200:
+ *         description: Avatar updated successfully
+ */
 router.post('/avatar', protect, updateAvatar);
 
 // Doctor specific route to request linking
+/**
+ * @swagger
+ * /api/v1/users/my-hospitals:
+ *   get:
+ *     summary: Get hospitals the doctor is linked to or has requested to link to
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     responses:
+ *       200:
+ *         description: Success
+ */
 router.get('/my-hospitals', protect, getMyHospitals);
+
+/**
+ * @swagger
+ * /api/v1/users/link-hospital:
+ *   post:
+ *     summary: Request to link doctor with a hospital
+ *     tags: [Users]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [hospitalId]
+ *             properties:
+ *               hospitalId:
+ *                 type: string
+ *                 description: MongoDB ObjectId of the hospital
+ *     responses:
+ *       200:
+ *         description: Link request sent successfully
+ */
 router.post('/link-hospital', protect, requestHospitalLink);
 
 export default router;

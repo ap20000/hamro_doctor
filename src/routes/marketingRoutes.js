@@ -11,9 +11,27 @@ import { protect, authorize } from '../middleware/authMiddleware.js';
 const router = express.Router();
 
 // Public route for tracking
+/**
+ * @swagger
+ * /api/v1/marketing/ads/{id}/track:
+ *   get:
+ *     summary: Track an advertisement view/impression
+ *     tags: [Marketing]
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema:
+ *           type: string
+ *         description: MongoDB ObjectId of the advertisement
+ *     responses:
+ *       200:
+ *         description: Tracked successfully
+ */
 router.get('/ads/:id/track', trackAdView);
 
 // Admin routes
+
 router.use(protect);
 router.use(authorize('admin'));
 
