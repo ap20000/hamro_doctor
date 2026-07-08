@@ -3,6 +3,7 @@ import extractText from '../services/analysis/extractText.js';
 import detectDiseases from '../services/analysis/diseaseDetect.js';
 import detectMedicines from '../services/analysis/medicineDetect.js';
 import openRouterVision from '../services/vision/openRouterVision.js';
+import { analyzeMedicalDocument } from '../services/analysis/medicalAnalysisService.js';
 
 /**
  * Validates uploaded file presence.
@@ -100,6 +101,37 @@ export const visionOcrController = async (req, res, next) => {
         });
     } catch (error) {
         // Ensure file is deleted even if error occurs
+        if (req.file && req.file.path && fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
+        next(error);
+    }
+};
+
+/**
+ * Extracts text, runs OpenMed disease & medicine detection, and generates patient explanation.
+ *
+ * @route POST /api/v1/analysis/explain
+ */
+export const explainController = async (req, res, next) => {
+    try {
+        if (!validateFile(req, res)) return;
+
+        const result = await analyzeMedicalDocument(req.file);
+
+        // Delete file after extraction to save disk space
+        if (req.file.path && fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+        }
+
+        res.status(200).json({
+            success: true,
+            ocrText: result.extractedText,
+            diseases: result.diseases,
+            medicines: result.medicines,
+            explanation: result.explanation
+        });
+    } catch (error) {
         if (req.file && req.file.path && fs.existsSync(req.file.path)) {
             fs.unlinkSync(req.file.path);
         }

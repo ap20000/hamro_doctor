@@ -23,46 +23,73 @@ export default async function detectDiseases(text) {
 
         if (!entities?.length) return [];
 
-        const diseases = [];
+        const rawResults = [];
         let current = null;
 
         for (const entity of entities) {
             const label = entity.entity_group || entity.label;
 
+            // Only process disease labels
             if (!label?.includes("DISEASE")) {
-                if (current) {
-                    diseases.push(current);
-                    current = null;
-                }
-
                 continue;
             }
-
-            const word = entity.word.replace("##", "");
 
             if (!current) {
                 current = {
-                    disease: word,
-                    confidence: entity.score,
+                    start: entity.start,
+                    end: entity.end,
+                    confidence: [entity.score],
                 };
-
                 continue;
             }
 
-            current.disease += entity.word.startsWith("##")
-                ? word
-                : ` ${word}`;
+            // Check if contiguous (subwords) or separated by a single space (adjacent words)
+            const isSubword = entity.word.startsWith("##") || entity.start === current.end;
+            const isAdjacentWord = entity.start === current.end + 1 && text[current.end] === ' ';
 
-            current.confidence = Math.min(
-                current.confidence,
-                entity.score
-            );
+            if (isSubword || isAdjacentWord) {
+                // Merge into current entity
+                current.end = entity.end;
+                current.confidence.push(entity.score);
+            } else {
+                // Save current and start a new entity
+                rawResults.push({
+                    disease: text.substring(current.start, current.end).trim(),
+                    confidence: current.confidence.reduce((a, b) => a + b, 0) / current.confidence.length,
+                });
+
+                current = {
+                    start: entity.start,
+                    end: entity.end,
+                    confidence: [entity.score],
+                };
+            }
         }
 
+        // Push the final entity if it exists
         if (current) {
-            diseases.push(current);
+            rawResults.push({
+                disease: text.substring(current.start, current.end).trim(),
+                confidence: current.confidence.reduce((a, b) => a + b, 0) / current.confidence.length,
+            });
         }
 
+        // Deduplicate and filter out empty/single-char results
+        const diseases = [];
+        const seen = new Set();
+        
+        for (const item of rawResults) {
+            const lower = item.disease.toLowerCase();
+            if (!seen.has(lower) && lower.length > 1) {
+                seen.add(lower);
+                
+                // Format decimal to 2 places for cleaner output
+                item.confidence = parseFloat(item.confidence.toFixed(2));
+                diseases.push(item);
+            }
+        }
+
+        console.log(`[Disease NER] Reconstructed ${diseases.length} distinct diseases.`);
         return diseases;
     } catch (error) {
         console.error("Disease detection failed:", error);

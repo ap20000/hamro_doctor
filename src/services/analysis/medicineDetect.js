@@ -23,46 +23,73 @@ export default async function detectMedicines(text) {
 
         if (!entities?.length) return [];
 
-        const medicines = [];
+        const rawResults = [];
         let current = null;
 
         for (const entity of entities) {
             const label = entity.entity_group || entity.label;
 
-            if (!label?.includes("MEDICINE") && !label?.includes("DRUG")) {
-                if (current) {
-                    medicines.push(current);
-                    current = null;
-                }
-
+            // Only process medicine labels
+            if (!label?.includes("MEDICINE") && !label?.includes("DRUG") && !label?.includes("CHEM")) {
                 continue;
             }
-
-            const word = entity.word.replace("##", "");
 
             if (!current) {
                 current = {
-                    medicine: word,
-                    confidence: entity.score,
+                    start: entity.start,
+                    end: entity.end,
+                    confidence: [entity.score],
                 };
-
                 continue;
             }
 
-            current.medicine += entity.word.startsWith("##")
-                ? word
-                : ` ${word}`;
+            // Check if contiguous (subwords) or separated by a single space (adjacent words)
+            const isSubword = entity.word.startsWith("##") || entity.start === current.end;
+            const isAdjacentWord = entity.start === current.end + 1 && text[current.end] === ' ';
 
-            current.confidence = Math.min(
-                current.confidence,
-                entity.score
-            );
+            if (isSubword || isAdjacentWord) {
+                // Merge into current entity
+                current.end = entity.end;
+                current.confidence.push(entity.score);
+            } else {
+                // Save current and start a new entity
+                rawResults.push({
+                    medicine: text.substring(current.start, current.end).trim(),
+                    confidence: current.confidence.reduce((a, b) => a + b, 0) / current.confidence.length,
+                });
+
+                current = {
+                    start: entity.start,
+                    end: entity.end,
+                    confidence: [entity.score],
+                };
+            }
         }
 
+        // Push the final entity if it exists
         if (current) {
-            medicines.push(current);
+            rawResults.push({
+                medicine: text.substring(current.start, current.end).trim(),
+                confidence: current.confidence.reduce((a, b) => a + b, 0) / current.confidence.length,
+            });
         }
 
+        // Deduplicate and filter out empty/single-char results
+        const medicines = [];
+        const seen = new Set();
+        
+        for (const item of rawResults) {
+            const lower = item.medicine.toLowerCase();
+            if (!seen.has(lower) && lower.length > 1) {
+                seen.add(lower);
+                
+                // Format decimal to 2 places for cleaner output
+                item.confidence = parseFloat(item.confidence.toFixed(2));
+                medicines.push(item);
+            }
+        }
+
+        console.log(`[Medicine NER] Reconstructed ${medicines.length} distinct medicines.`);
         return medicines;
     } catch (error) {
         console.error("Medicine detection failed:", error);

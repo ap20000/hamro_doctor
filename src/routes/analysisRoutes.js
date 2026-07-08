@@ -1,5 +1,5 @@
 import express from 'express';
-import { detectController, visionOcrController } from '../controllers/analysisController.js';
+import { detectController, visionOcrController, explainController } from '../controllers/analysisController.js';
 import { protect } from '../middleware/authMiddleware.js';
 import upload from '../middleware/uploadMiddleware.js';
 
@@ -59,5 +59,30 @@ router.post('/detect', protect, upload.single('file'), detectController);
  *         description: Invalid file format (images only)
  */
 router.post('/vision-ocr', protect, upload.single('file'), visionOcrController);
+
+/**
+ * @swagger
+ * /api/v1/analysis/explain:
+ *   post:
+ *     summary: Extract text, detect diseases & medicines, and generate client-friendly explanation
+ *     tags: [Analysis]
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         multipart/form-data:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               file:
+ *                 type: string
+ *                 format: binary
+ *                 description: Document or Image file to explain
+ *     responses:
+ *       200:
+ *         description: Full medical explanation generated successfully
+ */
+router.post('/explain', protect, upload.single('file'), explainController);
 
 export default router;
