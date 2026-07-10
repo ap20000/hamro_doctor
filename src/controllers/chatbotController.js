@@ -527,6 +527,7 @@ export const chatWithBot = async (req, res, next) => {
 
         // Save new context to ChatbotSession
         session.medicalContext = medicalAnalysis;
+        session.markModified('medicalContext');
         console.log('[MedicalContext] Saved to ChatbotSession');
       }
     } else if (message) {
