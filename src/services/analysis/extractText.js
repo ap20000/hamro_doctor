@@ -1,12 +1,10 @@
 import path from "path";
-import extractPdf from "./extractPdf.js";
-import extractTextFile from "./extractTextFile.js";
 import openRouterVision from "../vision/openRouterVision.js";
 
 /**
  * Extracts text from uploaded files based on file type.
  *
- * Supports PDF, TXT, and image formats.
+ * Supports image formats only.
  *
  * @param {Object} file - Uploaded file object from Multer.
  * @returns {Promise<string>} Extracted text content.
@@ -16,29 +14,31 @@ async function extractText(file) {
         return openRouterVision(file);
     }
 
-    if (!file.originalname) {
+    if (!file.originalname && !file.mimetype) {
         throw new Error("Invalid file object provided for extraction");
     }
 
-    const ext = path.extname(file.originalname).toLowerCase();
-
-    switch (ext) {
-        case ".pdf":
-            return extractPdf(file.path);
-
-        case ".txt":
-            return extractTextFile(file.path);
-
-        case ".jpg":
-        case ".jpeg":
-        case ".png":
-        case ".webp":
-        case ".gif":
-            return openRouterVision(file);
-
-        default:
-            throw new Error("Unsupported file type");
+    if (file.mimetype && file.mimetype.startsWith('image/')) {
+        return openRouterVision(file);
     }
+
+    if (file.originalname) {
+        const ext = path.extname(file.originalname).toLowerCase();
+
+        switch (ext) {
+            case ".jpg":
+            case ".jpeg":
+            case ".png":
+            case ".webp":
+            case ".gif":
+                return openRouterVision(file);
+
+            default:
+                throw new Error("Unsupported file type: only image files (JPG, PNG, WEBP, GIF) are allowed for text extraction.");
+        }
+    }
+
+    throw new Error("Unsupported file type: only image files are allowed.");
 }
 
 export default extractText;
