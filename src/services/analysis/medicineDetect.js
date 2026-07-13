@@ -1,11 +1,26 @@
-import { InferenceClient } from "@huggingface/inference";
+import { pipeline, env } from '@huggingface/transformers';
+import path from 'path';
+import { fileURLToPath } from 'url';
 
-const client = new InferenceClient(process.env.HF_TOKEN);
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
+env.allowRemoteModels = false;
+env.localModelPath = path.resolve(__dirname, '../../../public/onnx_model');
 
-const MODEL = "OpenMed/OpenMed-NER-PharmaDetect-SuperClinical-434M";
+let extractor = null;
+
+async function getExtractor() {
+    if (!extractor) {
+        extractor = await pipeline('token-classification', 'PharmaDetect', {
+            quantized: false,
+            local_files_only: true
+        });
+    }
+    return extractor;
+}
 
 /**
- * Detects medicine entities from medical text using a Hugging Face NER model.
+ * Detects medicine entities from medical text using a local Hugging Face NER model.
+ * Uses manual token aggregation to match the remote Inference API exactly.
  *
  * @param {string} text - Medical text to analyze.
  * @returns {Promise<Array<{medicine: string, confidence: number}>>}
@@ -15,19 +30,20 @@ export default async function detectMedicines(text) {
     if (!text?.trim()) return [];
 
     try {
-        const entities = await client.tokenClassification({
-            model: MODEL,
-            inputs: text,
-            provider: "hf-inference",
-        });
+        const detect = await getExtractor();
+        
+        // Removed { aggregation_strategy: "simple" } to get raw subword tokens,
+        // matching the raw input the interface model receives.
+        const entities = await detect(text);
 
         if (!entities?.length) return [];
 
         const rawResults = [];
         let current = null;
 
+        // Manual aggregation loop matching the Interface API
         for (const entity of entities) {
-            const label = entity.entity_group || entity.label;
+            const label = entity.entity_group || entity.label || entity.entity;
 
             // Only process medicine labels
             if (!label?.includes("MEDICINE") && !label?.includes("DRUG") && !label?.includes("CHEM")) {
@@ -36,32 +52,34 @@ export default async function detectMedicines(text) {
 
             if (!current) {
                 current = {
-                    start: entity.start,
-                    end: entity.end,
+                    word: entity.word.replace("##", ""),
                     confidence: [entity.score],
+                    lastIndex: entity.index
                 };
                 continue;
             }
 
-            // Check if contiguous (subwords) or separated by a single space (adjacent words)
-            const isSubword = entity.word.startsWith("##") || entity.start === current.end;
-            const isAdjacentWord = entity.start === current.end + 1 && text[current.end] === ' ';
+            const isConsecutive = entity.index === current.lastIndex + 1;
+            const isSubword = entity.word.startsWith("##");
 
-            if (isSubword || isAdjacentWord) {
-                // Merge into current entity
-                current.end = entity.end;
+            if (isConsecutive) {
+                if (isSubword) {
+                    current.word += entity.word.replace("##", "");
+                } else {
+                    current.word += " " + entity.word;
+                }
                 current.confidence.push(entity.score);
+                current.lastIndex = entity.index;
             } else {
-                // Save current and start a new entity
                 rawResults.push({
-                    medicine: text.substring(current.start, current.end).trim(),
+                    medicine: current.word,
                     confidence: current.confidence.reduce((a, b) => a + b, 0) / current.confidence.length,
                 });
 
                 current = {
-                    start: entity.start,
-                    end: entity.end,
+                    word: entity.word.replace("##", ""),
                     confidence: [entity.score],
+                    lastIndex: entity.index
                 };
             }
         }
@@ -69,7 +87,7 @@ export default async function detectMedicines(text) {
         // Push the final entity if it exists
         if (current) {
             rawResults.push({
-                medicine: text.substring(current.start, current.end).trim(),
+                medicine: current.word,
                 confidence: current.confidence.reduce((a, b) => a + b, 0) / current.confidence.length,
             });
         }

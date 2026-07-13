@@ -1,6 +1,7 @@
 import express from 'express';
 import { updateProfile, getBMI, getDoctors, updateAvatar, getHospitals, requestHospitalLink, getMyHospitals } from '../controllers/userController.js';
 import { protect } from '../middleware/authMiddleware.js';
+import imageRoutes from './imageRoutes.js';
 
 const router = express.Router();
 
@@ -147,5 +148,8 @@ router.get('/my-hospitals', protect, getMyHospitals);
  *         description: Link request sent successfully
  */
 router.post('/link-hospital', protect, requestHospitalLink);
+
+// User image upload & database retrieval endpoints (/api/v1/users/images)
+router.use('/images', imageRoutes);
 
 export default router;

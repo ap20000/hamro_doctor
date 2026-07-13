@@ -26,6 +26,7 @@ import marketingRoutes from './routes/marketingRoutes.js';
 import newsRoutes from './routes/newsRoutes.js';
 import chatbotRoutes from './routes/chatbotRoutes.js';
 import analysisRoutes from './routes/analysisRoutes.js';
+import imageRoutes from './routes/imageRoutes.js';
 
 dotenv.config();
 
@@ -110,6 +111,7 @@ app.use('/api/v1/marketing', marketingRoutes);
 app.use('/api/v1/news', newsRoutes);
 app.use('/api/v1/chatbot', chatbotRoutes);
 app.use('/api/v1/analysis', analysisRoutes);
+app.use('/api/v1/images', imageRoutes);
 
 // Error Handling Middleware
 app.use((err, req, res, next) => {
